@@ -1,20 +1,22 @@
 # API Design
 
-**Status:** Planned conventions + current actual status. Only a `/health`
-endpoint is planned for the current milestone; nothing is implemented yet.
+**Status:** Planned conventions + current actual status. `GET /health` is
+implemented as of Milestone 1; every other endpoint below is still planned.
 
 ## Current Status
 
-No API endpoints are implemented. The first planned endpoint is:
+One endpoint is implemented:
 
-- `GET /health` — returns a simple status payload confirming the Express
-  backend is reachable. This is the target for the current milestone (see
-  [../development-roadmap.md](../development-roadmap.md)).
+- `GET /health` — implemented in `apps/api`. Returns HTTP 200 with a JSON
+  payload confirming the Express backend is operational:
+  `{ "status": "ok", "service": "procureai-api", "milestone": "...", "timestamp": "<ISO-8601>" }`.
+  Served unversioned at the root path (see D18 in
+  [decisions.md](decisions.md)); it requires no authentication.
 
 ## Conventions (Planned)
 
-These conventions are intended to apply once real endpoints are built. None
-of this is implemented yet.
+These conventions are intended to apply once real application endpoints are
+built. Apart from `GET /health` above, none of this is implemented yet.
 
 - **Style:** REST over HTTP/JSON.
 - **Base path:** all application endpoints under a versioned prefix, e.g.

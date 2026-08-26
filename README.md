@@ -6,8 +6,9 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Foundation stage. No application code has been
-> scaffolded yet — see [Current Status](#current-status) below.
+> **Project status:** Milestone 1 (Project Foundation) complete — the React
+> frontend and Express backend are scaffolded and communicating. See
+> [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -108,11 +109,7 @@ for details and rationale.
 
 ## Current Status
 
-The project is at the **foundation stage**. `apps/web`, `apps/api`, and
-`apps/ai-service` are currently empty placeholder directories — no
-application code exists yet.
-
-The first implementation milestone is:
+**Milestone 1 — Project Foundation: complete.**
 
 ```text
 React Frontend
@@ -127,9 +124,52 @@ GET /health
 Frontend displays backend connection status
 ```
 
-See [docs/development-roadmap.md](docs/development-roadmap.md) for
-sequencing and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md)
-for what is explicitly out of scope until requested.
+- `apps/web` — React + TypeScript + Vite. Renders a government-portal-style
+  System Status page showing backend connectivity.
+- `apps/api` — Express + TypeScript. Serves `GET /health`.
+- `apps/ai-service` — not yet started (Milestone 3).
+
+No authentication, database, AI functionality, or procurement features are
+implemented yet. See
+[docs/development-roadmap.md](docs/development-roadmap.md) for sequencing and
+[docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for what
+is explicitly out of scope until requested.
+
+---
+
+## Running Locally
+
+Requires Node.js (developed against v22) and npm. `apps/web` and `apps/api`
+are independent projects, each installed and run separately.
+
+Start the backend:
+
+```bash
+cd apps/api
+npm install
+npm run dev          # http://localhost:4000
+```
+
+Then, in a second terminal, start the frontend:
+
+```bash
+cd apps/web
+npm install
+npm run dev          # http://localhost:5173
+```
+
+Open http://localhost:5173 — the System Status page reports whether the
+backend is reachable. In local development the frontend calls `/health`
+through the Vite dev-server proxy, which forwards to the API on port 4000.
+
+Verify the backend directly:
+
+```bash
+curl http://localhost:4000/health
+```
+
+Available scripts in both projects: `npm run dev`, `npm run build`,
+`npm run typecheck`.
 
 ---
 

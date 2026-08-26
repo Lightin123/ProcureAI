@@ -1,0 +1,89 @@
+# Hackathon Scope
+
+**Status:** Planned framing. This document distinguishes what is targeted
+for the Smart India Hackathon 2026 demonstration from the broader product
+vision, and marks what is currently implemented.
+
+## Currently Implemented
+
+Nothing beyond documentation. `apps/web`, `apps/api`, and `apps/ai-service`
+are empty placeholder directories.
+
+## Current Development Stage
+
+The project is at the **foundation stage**. The first implementation
+milestone (not yet started) is:
+
+```
+React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
+```
+
+## Explicitly Out of Scope for the Current Stage
+
+Per project instructions, the following must **not** be implemented until
+explicitly requested, regardless of how central they are to the product
+vision:
+
+- Authentication
+- PostgreSQL integration
+- An ORM (Prisma or otherwise)
+- AI functionality (FastAPI service implementation)
+- Vendor functionality
+- Procurement workflow logic
+- Semantic search
+- RAG (retrieval-augmented generation)
+- Document intelligence
+- Ranking / optimization logic
+- Docker
+- CI/CD pipelines
+- Deployment configuration
+
+## Likely Hackathon-Demo Scope (Not Yet Confirmed)
+
+For a Smart India Hackathon demonstration, the product vision in
+[requirements.md](requirements.md) is almost certainly larger than what can
+be fully implemented. A realistic demo slice likely includes at minimum:
+
+- Project creation and problem description input.
+- AI requirement extraction and clarification questions (single-pass, not
+  necessarily iterative).
+- Structured requirements review/approval.
+- Work package generation.
+- Vendor discovery via semantic search against a seeded vendor dataset.
+- A basic evaluation/ranking view with explanations.
+- Human decision recording.
+
+**This list is a reasonable inference, not a confirmed decision.** The exact
+hackathon-demo cut has not been discussed with the team and should be
+revisited in [../development-roadmap.md](../development-roadmap.md) as
+milestones are planned.
+
+## Future Ideas (Beyond Hackathon, Unscheduled)
+
+These are directionally consistent with the product vision but have not
+been discussed in enough detail to plan:
+
+- Vendor self-service portal (profile management, RFI submission UI).
+- Department/organization-level administration and multi-tenant scoping.
+- Advanced optimization across multiple work packages (portfolio-level
+  vendor selection).
+- Notification/communication features between officials and vendors.
+- Analytics/reporting across procurement history.
+
+## Unresolved Decisions Affecting Scope
+
+- Whether vendor self-service is in the hackathon build or a future
+  extension.
+- Whether "Government Administrator" and "Procurement Administrator" are
+  separate roles (see
+  [users-and-roles.md](users-and-roles.md)).
+- Performance/scale targets for the demo (see NFR9 in
+  [requirements.md](requirements.md)).
+- Deployment target for the hackathon demo, if any (see
+  [../engineering/deployment.md](../engineering/deployment.md)).
+
+## Related Documents
+
+- [requirements.md](requirements.md)
+- [../development-roadmap.md](../development-roadmap.md)
+- [../architecture/decisions.md](../architecture/decisions.md)

@@ -1,177 +1,102 @@
-# SIH26136 Procurement Platform
+# ProcureAI — SIH26136 Procurement Platform
 
-## Project
+AI-assisted government procurement planning and vendor discovery platform,
+built for Smart India Hackathon 2026. Full specifications live in `docs/` —
+that directory is the source of truth. This file holds only the essential,
+durable coding instructions. **Do not duplicate detailed specs here; update
+the relevant file in `docs/` instead and link to it.**
 
-This project is being developed for Smart India Hackathon 2026.
+Start here: [README.md](README.md) has the full documentation index.
 
-Problem Statement:
+## Project Essentials
 
-SIH26136 — Startup-Friendly Public Procurement Mechanism
+- Problem statement: [docs/product/problem-statement.md](docs/product/problem-statement.md)
+- Product vision & principles: [docs/product/product.md](docs/product/product.md)
+- The system is a **decision-support** platform. AI never makes a binding
+  procurement decision; a human official always does.
 
-The project is an AI-assisted government procurement planning and vendor
-discovery platform.
+## Technology Stack
 
-The platform helps government officials:
+See [docs/architecture/technology-stack.md](docs/architecture/technology-stack.md).
 
-1. Convert unstructured problems into structured requirements.
-2. Identify missing information.
-3. Generate clarification questions.
-4. Create procurement work packages.
-5. Discover suitable vendors using semantic search and structured filtering.
-6. Evaluate candidates using deterministic and AI-assisted analysis.
-7. Generate explainable procurement recommendations.
+- Frontend: React + TypeScript + Vite (`apps/web`)
+- Backend: Node.js + Express.js + TypeScript (`apps/api`)
+- AI Service: Python + FastAPI + Pydantic (`apps/ai-service`)
+- Database: PostgreSQL + pgvector
+- Local development, no Docker, no monorepo tooling (no Turborepo/Nx)
 
-The final procurement decision must always remain with a human official.
+## Architecture Rules
 
----
+Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.md).
 
-# Technology Stack
+- `apps/web` -> `apps/api` -> (`PostgreSQL` and `apps/ai-service`). The
+  frontend never calls the AI service or database directly.
+- `apps/web` and `apps/api` are independent projects, not a shared build
+  pipeline.
+- Do not introduce microservices or additional services without a clear
+  technical reason.
+- Do not introduce multi-agent AI architecture unless a specific capability
+  justifies it — see [docs/ai/ai-agents.md](docs/ai/ai-agents.md).
+- AI output must always be structured and validated (Pydantic on the AI
+  service side). Never treat raw LLM output as source of truth.
 
-Frontend:
-- React
-- TypeScript
-- Vite
+## Current Development Stage
 
-Backend:
-- Node.js
-- Express.js
-- TypeScript
+We are at the **foundation stage**. Full status:
+[docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
+[docs/development-roadmap.md](docs/development-roadmap.md).
 
-AI Service:
-- Python
-- FastAPI
-- Pydantic
+The current milestone is:
 
-Database:
-- PostgreSQL
-- pgvector
+```
+React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
+```
 
-Development:
-- Local development
-- No Docker for this project
-
----
-
-# Architecture
-
-The architecture is:
-
-React Frontend
-        |
-        | REST API
-        v
-Express Backend
-        |
-        +------ PostgreSQL + pgvector
-        |
-        +------ FastAPI AI Service
-
-The Express backend owns:
-
+**Do not implement** until explicitly requested:
 - Authentication
-- Authorization
-- Projects
-- Vendors
-- Workflow
-- Database access
-- API contracts
-- Application state
-
-The FastAPI AI service handles:
-
-- Requirement extraction
-- Clarification generation
-- Work package generation
-- Embeddings
-- AI-assisted analysis
-- Optimization
-
-Do not introduce microservices.
-
-Do not introduce additional services unless there is a clear technical reason.
-
----
-
-# Development Principles
-
-- Build incrementally using vertical slices.
-- Keep the project runnable after each milestone.
-- Prefer simple solutions over unnecessary abstractions.
-- Do not introduce technology only for buzzwords.
-- Do not introduce multi-agent architecture unless justified.
-- AI outputs must be structured and validated.
-- Do not trust raw LLM output as the source of truth.
-- Use deterministic logic where appropriate.
-- Human approval is required at important workflow stages.
-
----
-
-# Current Development Stage
-
-We are currently building the project foundation.
-
-The first milestone is:
-
-React Frontend
-        |
-        v
-Express Backend
-        |
-        v
-Health Endpoint
-
-The first end-to-end success condition is:
-
-The React frontend successfully communicates with the Express backend.
-
-Do not implement:
-
-- Authentication
-- Database models
-- PostgreSQL integration
-- AI functionality
+- Database models / PostgreSQL integration
+- AI functionality (FastAPI service logic)
 - Vendor functionality
-- Procurement logic
+- Procurement workflow logic
+- Docker, CI/CD, or deployment configuration
 
-until explicitly requested.
+## Development Workflow
 
----
-
-# Development Workflow
+Full process: [docs/engineering/development-workflow.md](docs/engineering/development-workflow.md).
 
 Before implementing a significant feature:
+1. Inspect the existing project structure and relevant `docs/` file.
+2. Propose a concise implementation plan.
+3. Wait for approval when appropriate.
+4. Make focused changes only — do not modify unrelated files.
+5. Update `docs/` if the change affects architecture, requirements,
+   database, API, AI pipeline, or UI design.
+6. Run relevant checks after implementation.
 
-1. Inspect the existing project structure.
-2. Understand the relevant code.
-3. Propose a concise implementation plan.
-4. Make focused changes only.
-5. Run the relevant checks after implementation.
+## Git Rules
 
-Do not modify unrelated files.
+Full detail: [docs/engineering/git-workflow.md](docs/engineering/git-workflow.md).
 
----
+- Never push directly to `main`.
+- Use feature branches: `feat/<name>`, `fix/<name>`, `chore/<name>`,
+  `docs/<name>`, `refactor/<name>`, `test/<name>`.
+- Changes reach `main` through Pull Requests. Keep commits focused; do not
+  mix unrelated features in one PR.
 
-# Git Rules
+## Code Style
 
-- Never push directly to main.
-- Use feature branches.
-- Keep commits focused.
-- Do not mix unrelated features in one pull request.
-
-Branch naming:
-
-feat/<feature-name>
-fix/<issue-name>
-chore/<task-name>
-
----
-
-# Code Style
-
-- Use TypeScript for frontend and backend.
-- Use Python for the AI service.
-- Avoid `any` unless absolutely necessary.
-- Validate external input.
-- Prefer descriptive names.
-- Prefer readable code over clever abstractions.
+- TypeScript for frontend and backend; avoid `any` unless unavoidable.
+- Python for the AI service.
+- Validate all external input at API boundaries.
+- Prefer descriptive names and readable code over clever abstractions.
 - Do not add unnecessary comments.
+
+## UI Design
+
+Full detail: [docs/design/ui-design.md](docs/design/ui-design.md).
+
+The UI must look like a professional Indian government portal — structured,
+authoritative, accessible. It must not look like a generic SaaS dashboard,
+a chatbot product, or a flashy startup landing page. AI appears as
+structured, reviewable recommendations integrated into the workflow, not as
+a chat-first interface.

@@ -1,29 +1,38 @@
 # Development Roadmap
 
-**Status:** Planned sequencing. Only Milestone 0 is currently in progress
-(documentation). No application code exists yet.
+**Status:** Milestones 0 and 1 are complete. Milestone 2 onward is planned
+sequencing only.
 
-## Milestone 0 — Documentation Foundation (In Progress)
+## Milestone 0 — Documentation Foundation (Complete)
 
 Establish `docs/`, `README.md`, and `CLAUDE.md` so architecture, product,
 and process decisions are recorded before implementation begins.
 
-## Milestone 1 — Project Foundation (Next)
+## Milestone 1 — Project Foundation (Complete)
 
 ```
 React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
 ```
 
-- Scaffold `apps/web` (React + TypeScript + Vite).
-- Scaffold `apps/api` (Node.js + Express + TypeScript).
-- Implement a single `GET /health` endpoint.
-- Frontend calls `/health` and displays connection status.
-- No auth, no database, no AI service involvement.
+- [x] Scaffold `apps/web` (React + TypeScript + Vite).
+- [x] Scaffold `apps/api` (Node.js + Express + TypeScript).
+- [x] Implement a single `GET /health` endpoint.
+- [x] Frontend calls `/health` and displays connection status.
+- [x] No auth, no database, no AI service involvement.
 
-Success condition: the React frontend successfully communicates with the
-Express backend.
+Success condition met: the React frontend successfully communicates with
+the Express backend. The frontend reaches the API through the Vite dev
+proxy in local development (see D17 in
+[architecture/decisions.md](architecture/decisions.md)).
 
-## Milestone 2 — Procurement Project Skeleton (Planned, Not Detailed)
+Running it locally — two terminals, from the repository root:
+
+```
+cd apps/api && npm install && npm run dev     # http://localhost:4000
+cd apps/web && npm install && npm run dev     # http://localhost:5173
+```
+
+## Milestone 2 — Procurement Project Skeleton (Next, Not Detailed)
 
 - Introduce PostgreSQL integration and initial schema for procurement
   projects (see [architecture/database.md](architecture/database.md)).

@@ -1,8 +1,9 @@
 # Architecture
 
-**Status:** Confirmed direction for the current stage. Only the frontend and
-backend skeleton (health check) is planned as the next implementation step;
-the rest of this document describes target architecture.
+**Status:** Confirmed direction. The frontend/backend skeleton (health
+check) is implemented as of Milestone 1; the rest of this document
+describes target architecture that is not yet built. See
+[Current Implementation Status](#current-implementation-status).
 
 ## High-Level Component Diagram
 
@@ -221,10 +222,13 @@ now. See [decisions.md](decisions.md).
 
 ## Current Implementation Status
 
-Nothing has been implemented. `apps/web`, `apps/api`, and `apps/ai-service`
-are empty directories. The first milestone will implement only the Frontend
--> Backend -> `/health` slice; PostgreSQL, file storage, background
-processing, and the AI service are not part of that milestone.
+Milestone 1 (Project Foundation) is implemented: `apps/web` (React +
+TypeScript + Vite) calls `apps/api` (Express + TypeScript) over REST, and
+the frontend displays the backend's `GET /health` status.
+
+Not yet implemented: `apps/ai-service` (still an empty directory),
+PostgreSQL, file storage, and background job processing. Those components
+are described above as target architecture only.
 
 ## Related Documents
 

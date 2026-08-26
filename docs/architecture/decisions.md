@@ -22,6 +22,10 @@ architectural, product, or process decision is made.
 | D11 | First implementation milestone is Frontend -> Backend -> `GET /health` | Establish the simplest possible end-to-end vertical slice before any domain logic |
 | D12 | Documentation in `docs/` is the source of truth for detailed specs; `CLAUDE.md` stays concise and links to it | Avoid duplicating/drifting specs across files |
 | D13 | Docs organized into subdirectories (`product/`, `architecture/`, `ai/`, `design/`, `engineering/`) rather than a flat `docs/` directory | Keep growing documentation navigable |
+| D15 | npm is the package manager for `apps/web` and `apps/api` | Already the documented assumption; available in the local environment. Resolves U15 |
+| D16 | Local development ports: Express API on `4000`, Vite dev server on `5173` | Vite's default for the frontend; a distinct, unused port for the API. API port is overridable via the `PORT` environment variable |
+| D17 | In local development the frontend reaches the backend through the Vite dev-server proxy rather than CORS middleware | Keeps requests same-origin in dev, so no CORS dependency or configuration is needed yet. Revisit when the frontend is served from somewhere other than the Vite dev server |
+| D18 | `GET /health` is served unversioned at the root, not under a versioned prefix | Matches the endpoint documented in [api-design.md](api-design.md) and standard health-check convention; deliberately does not pre-empt the still-open versioning decision (U7) |
 
 ## Open / Unresolved Decisions
 
@@ -41,7 +45,6 @@ architectural, product, or process decision is made.
 | U12 | Deployment target (if any) for hackathon demo | See [../engineering/deployment.md](../engineering/deployment.md) |
 | U13 | Performance/scale targets | See NFR9 in [../product/requirements.md](../product/requirements.md) |
 | U14 | Embedding model, vector dimensionality, and pgvector indexing strategy | See [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md) |
-| U15 | Package manager for JS/TS projects (assumed npm, not confirmed) | See [technology-stack.md](technology-stack.md) |
 | U16 | Background/async job processing mechanism (in-process, task queue library e.g. BullMQ, broker e.g. Redis, or other) | Component is named in [architecture.md](architecture.md); specific technology not yet chosen |
 | U17 | Frontend job-status delivery mechanism (polling, SSE, WebSockets, or other) | See "Asynchronous Request Flow" in [architecture.md](architecture.md) |
 | U18 | Organization/department scoping model (strict hierarchy vs. flat, single-org-per-user vs. multi-org membership) | See [database.md](database.md) |

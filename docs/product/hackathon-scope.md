@@ -6,17 +6,20 @@ vision, and marks what is currently implemented.
 
 ## Currently Implemented
 
-Nothing beyond documentation. `apps/web`, `apps/api`, and `apps/ai-service`
-are empty placeholder directories.
-
-## Current Development Stage
-
-The project is at the **foundation stage**. The first implementation
-milestone (not yet started) is:
+Milestone 1 (Project Foundation) only:
 
 ```
 React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
 ```
+
+`apps/web` (React + TypeScript + Vite) and `apps/api` (Express +
+TypeScript) are scaffolded and communicate over REST. `apps/ai-service`
+remains an empty placeholder directory.
+
+## Current Development Stage
+
+Milestone 1 is complete. Milestone 2 has not been started — see
+[../development-roadmap.md](../development-roadmap.md).
 
 ## Explicitly Out of Scope for the Current Stage
 

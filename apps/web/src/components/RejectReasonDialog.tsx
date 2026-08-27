@@ -1,66 +1,91 @@
 import { useState, type FormEvent } from "react";
+import { GovernmentModal } from "./GovernmentModal.js";
 
-interface RejectReasonDialogProps {
+export interface RejectReasonDialogProps {
   requirementText: string;
-  onCancel: () => void;
   onConfirm: (reason: string) => void;
+  onCancel: () => void;
 }
 
-export function RejectReasonDialog({ requirementText, onCancel, onConfirm }: RejectReasonDialogProps) {
+export function RejectReasonDialog({
+  requirementText,
+  onConfirm,
+  onCancel,
+}: RejectReasonDialogProps) {
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | undefined>(undefined);
+  const trimmed = reason.trim();
+  const isValid = trimmed.length >= 3;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (reason.trim().length < 3) {
-      setError("A reason is required when rejecting a suggestion.");
-      return;
-    }
-    onConfirm(reason.trim());
+    if (!isValid) return;
+    onConfirm(trimmed);
   }
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="reject-heading">
-      <div className="dialog">
-        <h2 className="dialog__heading" id="reject-heading">
-          Reject Suggestion
-        </h2>
-        <div className="dialog__body">
-          <p className="dialog__context">{requirementText}</p>
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="form-field">
-              <label className="form-field__label" htmlFor="reject-reason">
-                Reason for rejection <span className="form-field__required">* required</span>
-              </label>
-              <p className="form-field__hint" id="reject-reason-hint">
-                This reason is recorded against the item for audit purposes.
-              </p>
-              <textarea
-                id="reject-reason"
-                className={`form-field__input form-field__textarea${error === undefined ? "" : " form-field__input--error"}`}
-                rows={4}
-                value={reason}
-                aria-describedby="reject-reason-hint"
-                aria-invalid={error !== undefined}
-                onChange={(event) => setReason(event.target.value)}
-              />
-              {error !== undefined && (
-                <p className="form-field__error" role="alert">
-                  {error}
-                </p>
-              )}
-            </div>
-            <div className="dialog__actions">
-              <button type="button" className="button button--secondary" onClick={onCancel}>
-                Cancel
-              </button>
-              <button type="submit" className="button button--danger">
-                Reject Suggestion
-              </button>
-            </div>
-          </form>
+    <GovernmentModal
+      isOpen={true}
+      title="Record Rejection Reason"
+      onClose={onCancel}
+      footer={
+        <>
+          <button
+            type="button"
+            className="gov-btn gov-btn--tertiary"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="gov-btn gov-btn--danger"
+            disabled={!isValid}
+            onClick={handleSubmit}
+          >
+            Confirm Rejection
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        <p className="gov-form-hint" style={{ marginBottom: "12px" }}>
+          You are rejecting the following suggestion:
+        </p>
+
+        <blockquote
+          style={{
+            margin: "0 0 16px",
+            padding: "10px 14px",
+            backgroundColor: "var(--gov-bg-alt)",
+            borderLeft: "3px solid var(--gov-danger)",
+            fontSize: "14px",
+            fontStyle: "italic",
+            color: "var(--gov-text-primary)",
+          }}
+        >
+          “{requirementText}”
+        </blockquote>
+
+        <div className="gov-form-group">
+          <label className="gov-form-label" htmlFor="rejection-reason">
+            Reason for rejection <span className="gov-form-required">*</span>
+          </label>
+          <p className="gov-form-hint" id="rejection-reason-hint">
+            Record the administrative or technical rationale for audit and procurement transparency.
+          </p>
+          <textarea
+            id="rejection-reason"
+            className="gov-form-control"
+            rows={4}
+            maxLength={1000}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="State why this requirement/constraint is not appropriate..."
+            aria-describedby="rejection-reason-hint"
+            autoFocus
+          />
         </div>
-      </div>
-    </div>
+      </form>
+    </GovernmentModal>
   );
 }

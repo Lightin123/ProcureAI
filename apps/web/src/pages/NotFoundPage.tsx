@@ -1,19 +1,26 @@
+import React from "react";
 import { Link } from "react-router-dom";
 
 import { Breadcrumb } from "../components/Breadcrumb.js";
+import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { PageHeader } from "../components/PageHeader.js";
 
 export function NotFoundPage() {
   return (
     <>
       <Breadcrumb items={[{ label: "Home", to: "/" }, { label: "Page Not Found" }]} />
-      <PageHeader title="Page Not Found" />
-      <div className="notice notice--warning" role="alert">
-        <p className="notice__title">The requested page does not exist</p>
-        <p className="notice__body">
-          Check the address, or return to the <Link to="/projects">Procurement Projects</Link> register.
+      <PageHeader
+        title="404 — Page Not Found"
+        subtitle="The requested government procurement record or resource could not be found."
+      />
+      <GovernmentAlert type="warning" title="Resource Unreachable">
+        <p style={{ margin: "0 0 10px" }}>
+          The requested URL does not match any official register entry. Please verify the URL or return to the central directory.
         </p>
-      </div>
+        <Link to="/projects" className="gov-btn gov-btn--primary gov-btn--sm">
+          Return to Procurement Projects Register
+        </Link>
+      </GovernmentAlert>
     </>
   );
 }

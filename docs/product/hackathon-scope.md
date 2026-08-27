@@ -6,19 +6,20 @@ vision, and marks what is currently implemented.
 
 ## Currently Implemented
 
-Milestone 1 (Project Foundation) only:
+Milestones 1 and 2:
 
-```
-React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
-```
+- **Milestone 1** — React frontend and Express backend communicating over
+  REST, with `GET /health`.
+- **Milestone 2** — procurement projects persisted in PostgreSQL: an
+  official can create a project with a free-form problem description, see
+  the project register, and open a project's detail page. Projects are
+  created in the `DRAFT` workflow state.
 
-`apps/web` (React + TypeScript + Vite) and `apps/api` (Express +
-TypeScript) are scaffolded and communicate over REST. `apps/ai-service`
-remains an empty placeholder directory.
+`apps/ai-service` remains an empty placeholder directory.
 
 ## Current Development Stage
 
-Milestone 1 is complete. Milestone 2 has not been started — see
+Milestone 2 is complete. Milestone 3 has not been started — see
 [../development-roadmap.md](../development-roadmap.md).
 
 ## Explicitly Out of Scope for the Current Stage
@@ -28,11 +29,11 @@ explicitly requested, regardless of how central they are to the product
 vision:
 
 - Authentication
-- PostgreSQL integration
-- An ORM (Prisma or otherwise)
+- Role-based access control
 - AI functionality (FastAPI service implementation)
 - Vendor functionality
-- Procurement workflow logic
+- Procurement workflow **transitions** (the state model is defined and
+  projects are created in `DRAFT`, but nothing advances yet)
 - Semantic search
 - RAG (retrieval-augmented generation)
 - Document intelligence

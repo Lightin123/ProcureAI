@@ -1,3 +1,10 @@
+import { NavLink } from "react-router-dom";
+
+const NAV_ITEMS = [
+  { to: "/projects", label: "Procurement Projects" },
+  { to: "/status", label: "System Status" },
+];
+
 export function PortalHeader() {
   return (
     <header className="portal-header">
@@ -21,11 +28,18 @@ export function PortalHeader() {
 
       <nav className="portal-nav" aria-label="Primary">
         <ul className="portal-nav__list">
-          <li>
-            <a className="portal-nav__link portal-nav__link--active" href="/" aria-current="page">
-              System Status
-            </a>
-          </li>
+          {NAV_ITEMS.map((item) => (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                className={({ isActive }) =>
+                  `portal-nav__link${isActive ? " portal-nav__link--active" : ""}`
+                }
+              >
+                {item.label}
+              </NavLink>
+            </li>
+          ))}
         </ul>
       </nav>
     </header>

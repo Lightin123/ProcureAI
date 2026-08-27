@@ -2,6 +2,7 @@ export interface HealthResponse {
   status: string;
   service: string;
   milestone: string;
+  database: string;
   timestamp: string;
 }
 
@@ -16,6 +17,7 @@ function isHealthResponse(value: unknown): value is HealthResponse {
     typeof candidate.status === "string" &&
     typeof candidate.service === "string" &&
     typeof candidate.milestone === "string" &&
+    typeof candidate.database === "string" &&
     typeof candidate.timestamp === "string"
   );
 }

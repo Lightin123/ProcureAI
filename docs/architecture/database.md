@@ -1,21 +1,44 @@
 # Database Design
 
-**Status:** Planned / conceptual only. No schema, migrations, or ORM have
-been implemented. PostgreSQL integration is explicitly out of scope until
-requested — see [../product/hackathon-scope.md](../product/hackathon-scope.md).
+**Status:** Partially implemented. Milestone 2 created the first three
+tables — `organizations`, `users`, and `procurement_projects` — plus a
+`schema_migrations` tracking table. Every other data area below remains
+conceptual and undesigned.
 
-This document maps the conceptual data areas implied by the product
-requirements and architecture. It intentionally does **not** define table
-names, columns, relationships, SQL, migrations, or an ORM/model layer — that
-level of detail is deferred until PostgreSQL integration is actually
-requested.
+This document maps the data areas implied by the product requirements and
+architecture. The Implemented Schema section below reflects what actually
+exists; everything under Conceptual Data Areas is a scope map only, and
+detailed design for those areas is deferred to the milestone that builds
+them.
 
 ## Confirmed Decisions
 
-- PostgreSQL is the system of record.
+- PostgreSQL is the system of record. The development instance is hosted
+  rather than local (D19).
+- Data access is `pg` with hand-written SQL and plain `.sql` migrations —
+  no ORM (D20).
 - The pgvector extension will be used for embeddings-based semantic search.
+  It is **not enabled yet**; it is not needed until Milestone 4.
 - The Express backend (`apps/api`) is the only component with direct
   database access.
+
+## Implemented Schema (Milestone 2)
+
+Defined in `apps/api/migrations/001_init.sql`:
+
+- `organizations` — `id`, `name`, `code` (unique), `created_at`.
+- `users` — `id`, `full_name`, `email` (unique), `role`, `organization_id`,
+  `created_at`. **No credential columns**: authentication is unresolved
+  (U3), so only identity is modelled.
+- `procurement_projects` — `id`, `reference_number` (unique),
+  `organization_id`, `created_by`, `title`, `problem_description`,
+  `status`, `created_at`, `updated_at`. Indexed on `organization_id` and
+  `created_at DESC`.
+- `procurement_project_status` — a PostgreSQL enum holding the nine
+  workflow states defined in
+  [../design/procurement-workflow.md](../design/procurement-workflow.md)
+  (D22). Only `DRAFT` is currently reachable.
+- `schema_migrations` — applied-migration tracking for the runner.
 
 ## Conceptual Data Areas (Not Yet Designed in Detail)
 

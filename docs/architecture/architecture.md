@@ -222,13 +222,21 @@ now. See [decisions.md](decisions.md).
 
 ## Current Implementation Status
 
-Milestone 1 (Project Foundation) is implemented: `apps/web` (React +
-TypeScript + Vite) calls `apps/api` (Express + TypeScript) over REST, and
-the frontend displays the backend's `GET /health` status.
+Milestones 1 and 2 are implemented:
 
-Not yet implemented: `apps/ai-service` (still an empty directory),
-PostgreSQL, file storage, and background job processing. Those components
-are described above as target architecture only.
+- `apps/web` (React + TypeScript + Vite) calls `apps/api` over REST.
+- `apps/api` (Express + TypeScript) serves `GET /health` and the
+  `/api/v1/projects` endpoints, and is the only component that talks to
+  PostgreSQL.
+- PostgreSQL holds organizations, users, and procurement projects. The
+  development database is hosted rather than local (D19). The pgvector
+  extension is **not** enabled yet — it is not needed until semantic search
+  in Milestone 4.
+
+Not yet implemented: `apps/ai-service` (still an empty directory), file
+storage, and background job processing. Those are described above as target
+architecture only. Authentication and RBAC also do not exist yet — the
+backend resolves a single seeded official server-side (D21).
 
 ## Related Documents
 

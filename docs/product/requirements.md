@@ -164,17 +164,25 @@ later stage requires it.
 
 ## Current Milestone Scope
 
-The current and only actively-implemented milestone is the foundational
-health-check slice:
+Milestones 1 and 2 are implemented. Against the functional requirements
+above:
 
-```
-React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
-```
+| Requirement | Status |
+|---|---|
+| FR1.1 — official can create a procurement project | Implemented |
+| FR1.2 — free-form natural-language problem description | Implemented |
+| FR1.3 — project tracks its current workflow stage | Partially implemented — the nine-state model is defined and projects are created in `DRAFT`, but no transitions exist yet |
+| FR2–FR9 | Not implemented |
+| FR10 — access control | Not implemented. Projects are scoped by organization in every query, but there is no authentication or RBAC yet |
+| FR11 — auditability | Not implemented |
 
-None of the functional requirements above (FR1–FR11) are implemented yet.
-This document describes target behavior for planning and documentation
-purposes only. See [hackathon-scope.md](hackathon-scope.md) for the
-distinction between hackathon-demo scope and long-term product scope, and
+Against the non-functional requirements: NFR3 is partially met (all request
+bodies are validated at the API boundary; authentication and authorization
+are not built). NFR6 and NFR7 are being observed. The remainder depend on
+features not yet implemented.
+
+See [hackathon-scope.md](hackathon-scope.md) for the distinction between
+hackathon-demo scope and long-term product scope, and
 [../development-roadmap.md](../development-roadmap.md) for sequencing.
 
 ## Related Documents

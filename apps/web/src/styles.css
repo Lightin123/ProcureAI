@@ -450,3 +450,140 @@ a {
     overflow-x: auto;
   }
 }
+
+.notice--warning {
+  border-left-color: var(--color-pending);
+  background-color: var(--color-pending-bg);
+}
+
+.notice--warning .notice__title {
+  color: var(--color-pending);
+}
+
+.notice--info {
+  border-left-color: var(--color-navy);
+  background-color: #eef2f6;
+}
+
+.notice--info .notice__title {
+  color: var(--color-navy-dark);
+}
+
+.notice code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.panel__message {
+  margin: 0;
+  padding: 16px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.prose {
+  margin: 0;
+  max-width: 80ch;
+  font-size: 15px;
+  white-space: pre-wrap;
+}
+
+.form-field {
+  margin-bottom: 22px;
+}
+
+.form-field:last-child {
+  margin-bottom: 0;
+}
+
+.form-field__label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.form-field__required {
+  color: var(--color-unavailable);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-field__hint {
+  margin: 0 0 7px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  max-width: 75ch;
+}
+
+.form-field__input {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 2px;
+  padding: 8px 10px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.form-field__input:focus-visible {
+  border-color: var(--color-navy);
+}
+
+.form-field__input--error {
+  border-color: var(--color-unavailable);
+  border-width: 2px;
+}
+
+.form-field__textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.form-field__error {
+  margin: 6px 0 0;
+  color: var(--color-unavailable);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--color-border);
+  background-color: #f7f8fa;
+}
+
+.button--secondary {
+  background-color: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background-color: #eceef1;
+}
+
+.data-table a,
+.breadcrumb a {
+  color: var(--color-navy-light);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions .button {
+    width: 100%;
+  }
+}

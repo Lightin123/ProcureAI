@@ -171,8 +171,18 @@ Procurement Projects entity in
 
 ### Current Implementation Status
 
-As of Milestone 2, only `DRAFT` is reachable. Projects are created in
-`DRAFT` and no transition logic exists yet. The full enumeration is defined
+As of Milestone 3, three states are reachable: `DRAFT`,
+`REQUIREMENTS_ANALYSIS`, and `REQUIREMENTS_CONFIRMED`. Transitions:
+
+- `DRAFT -> REQUIREMENTS_ANALYSIS` when the official runs AI analysis.
+- `REQUIREMENTS_ANALYSIS -> REQUIREMENTS_CONFIRMED` when the official
+  confirms, which requires at least one accepted requirement (D33).
+- `REQUIREMENTS_CONFIRMED -> REQUIREMENTS_ANALYSIS` via an explicit reopen
+  action (D34).
+
+Every transition is triggered by an explicit official action and is recorded
+in `project_stage_history` (D32). States from `WORK_PACKAGES_CONFIRMED`
+onward remain unreachable. The full enumeration is defined
 here — and in the database — so that later milestones extend behaviour
 rather than repeatedly widening the state model.
 

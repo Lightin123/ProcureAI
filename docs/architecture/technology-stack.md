@@ -33,6 +33,19 @@ Rationale: Python has the strongest ecosystem for AI/ML/NLP work; FastAPI
 gives typed, validated request/response models via Pydantic, which directly
 supports the "AI output must be structured and validated" principle.
 
+The LLM is reached through one of three interchangeable providers, selected by
+configuration rather than code (see
+[../ai/ai-system.md](../ai/ai-system.md)):
+
+- `openai_compatible` via the `openai` SDK — **what the project currently runs
+  on**, pointed at Groq (D38, D41).
+- `anthropic` via the `anthropic` SDK, using structured outputs (D27).
+- `stub` — deterministic, no credentials, so the platform runs without a key
+  (D36).
+
+The provider and model are configuration, so changing service does not change
+provider code.
+
 ## Database
 
 - PostgreSQL
@@ -72,7 +85,6 @@ and [decisions.md](decisions.md).
 
 ## Unresolved / Not Yet Decided
 
-- Specific LLM provider(s) and model(s) used by the AI service.
 - Testing frameworks per component (see
   [../engineering/testing-strategy.md](../engineering/testing-strategy.md)).
 - Linting/formatting tooling.

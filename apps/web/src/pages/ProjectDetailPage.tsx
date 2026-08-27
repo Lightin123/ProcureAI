@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { getProject, type ProcurementProject } from "../api/projects.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { PageHeader } from "../components/PageHeader.js";
+import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
 import { ProjectStatusBadge } from "../components/ProjectStatusBadge.js";
 
 type LoadState =
@@ -62,6 +63,8 @@ export function ProjectDetailPage() {
         action={state.kind === "loaded" ? <ProjectStatusBadge status={state.project.status} /> : undefined}
       />
 
+      {id !== undefined && <ProjectSectionNav projectId={id} />}
+
       {state.kind === "loading" && <p className="panel__message">Loading project…</p>}
 
       {state.kind === "failed" && (
@@ -117,10 +120,11 @@ export function ProjectDetailPage() {
           </section>
 
           <div className="notice notice--info">
-            <p className="notice__title">Requirement analysis not yet available</p>
+            <p className="notice__title">Next step: requirement analysis</p>
             <p className="notice__body">
-              This project is recorded in draft. Requirement analysis and later
-              procurement stages are not yet part of the platform.
+              Open the <Link to={`/projects/${state.project.id}/requirements`}>Requirements</Link>{" "}
+              section to run AI analysis, review the suggested requirements, and confirm
+              them. Later procurement stages are not yet part of the platform.
             </p>
           </div>
         </>

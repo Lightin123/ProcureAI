@@ -164,21 +164,32 @@ later stage requires it.
 
 ## Current Milestone Scope
 
-Milestones 1 and 2 are implemented. Against the functional requirements
+Milestones 1 through 3 are implemented. Against the functional requirements
 above:
 
 | Requirement | Status |
 |---|---|
 | FR1.1 — official can create a procurement project | Implemented |
 | FR1.2 — free-form natural-language problem description | Implemented |
-| FR1.3 — project tracks its current workflow stage | Partially implemented — the nine-state model is defined and projects are created in `DRAFT`, but no transitions exist yet |
-| FR2–FR9 | Not implemented |
+| FR1.3 — project tracks its current workflow stage | Implemented for the three requirement states, with every transition recorded in `project_stage_history` |
+| FR2.1 — extract structured requirements | Implemented |
+| FR2.2 — identify constraints | Implemented (`CONSTRAINT` kind with BUDGET / TIMELINE / COMPLIANCE categories) |
+| FR2.3 — detect missing information | Implemented |
+| FR2.4 — generate clarification questions | Implemented |
+| FR2.5 — official answers clarifications, fed back into analysis | Implemented |
+| FR2.6 — edit / approve / reject AI-extracted requirements | Implemented, with rejection requiring a reason |
+| FR3–FR9 | Not implemented |
 | FR10 — access control | Not implemented. Projects are scoped by organization in every query, but there is no authentication or RBAC yet |
 | FR11 — auditability | Not implemented |
 
-Against the non-functional requirements: NFR3 is partially met (all request
-bodies are validated at the API boundary; authentication and authorization
-are not built). NFR6 and NFR7 are being observed. The remainder depend on
+Against the non-functional requirements: **NFR1** is met for requirement
+analysis — every suggestion carries a rationale. **NFR2** is met: AI output is
+schema-validated by Pydantic and re-validated by zod before persistence.
+**NFR3** is partially met (input validated at the boundary; authentication and
+authorization are not built). **NFR4** is partially met — stage transitions and
+review decisions are recorded, though a general audit log does not exist.
+**NFR8** is met for requirements via the provenance model. NFR6 and NFR7 are
+being observed. The remainder depend on
 features not yet implemented.
 
 See [hackathon-scope.md](hackathon-scope.md) for the distinction between

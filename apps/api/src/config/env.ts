@@ -34,6 +34,8 @@ export interface AppConfig {
   port: number;
   databaseUrl: string | undefined;
   databaseSsl: false | { rejectUnauthorized: boolean };
+  aiServiceUrl: string;
+  aiServiceTimeoutMs: number;
 }
 
 export function loadConfig(): AppConfig {
@@ -50,5 +52,7 @@ export function loadConfig(): AppConfig {
       databaseUrl !== undefined && isLocalHost(databaseUrl)
         ? false
         : { rejectUnauthorized: strictSsl },
+    aiServiceUrl: process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000",
+    aiServiceTimeoutMs: Number.parseInt(process.env.AI_SERVICE_TIMEOUT_MS ?? "60000", 10),
   };
 }

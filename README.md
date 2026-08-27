@@ -6,9 +6,9 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 2 (Procurement Project Skeleton) complete —
-> procurement projects can be created, listed, and viewed, persisted in
-> PostgreSQL. See [Current Status](#current-status) below.
+> **Project status:** Milestone 3 (AI Requirement Analysis) complete — an
+> official can run AI analysis on a project, review the suggested
+> requirements, and confirm them. See [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -109,21 +109,27 @@ for details and rationale.
 
 ## Current Status
 
-**Milestone 2 — Procurement Project Skeleton: complete.**
+**Milestone 3 — AI Requirement Analysis: complete.**
 
-An official can create a procurement project with a free-form problem
-description, view the project register, and open a project's detail page.
-Projects are persisted in PostgreSQL and created in the `DRAFT` workflow
-state.
+An official creates a procurement project, runs AI analysis on its problem
+description, reviews the suggested requirements and constraints, answers
+clarification questions, and confirms the requirements — moving the project
+`DRAFT → REQUIREMENTS_ANALYSIS → REQUIREMENTS_CONFIRMED`.
 
-- `apps/web` — React + TypeScript + Vite. Government-portal-style Projects
-  register, project detail, create form, and System Status pages.
-- `apps/api` — Express + TypeScript. `GET /health` plus
-  `/api/v1/projects` (list, detail, create), backed by PostgreSQL via `pg`.
-- `apps/ai-service` — not yet started (Milestone 3).
+- `apps/web` — React + TypeScript + Vite. Projects register, project detail,
+  create form, requirements review screen, and System Status.
+- `apps/api` — Express + TypeScript. Health, projects, and requirement
+  analysis endpoints, backed by PostgreSQL via `pg`.
+- `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
+  analysis with three interchangeable providers selected by configuration:
+  OpenAI-compatible (currently Groq), Anthropic, and a deterministic stub
+  that needs no API key.
 
-No authentication, RBAC, AI functionality, vendor discovery, or workflow
-transitions are implemented yet. See
+Every AI suggestion is reviewable — nothing enters the confirmed record
+without an explicit decision by the official.
+
+No authentication, RBAC, vendor discovery, work packages, or semantic search
+are implemented yet. See
 [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing and
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for what
 is explicitly out of scope until requested.
@@ -150,7 +156,35 @@ npm run seed         # create the development department and official
 npm run dev          # http://localhost:4000
 ```
 
-**3. Start the frontend** in a second terminal:
+**3. Start the AI service** in a second terminal. It runs the deterministic
+stub provider unless an LLM API key is configured — no key is needed to run or
+demonstrate the platform:
+
+```bash
+cd apps/ai-service
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+```
+
+To use a real model, copy `apps/ai-service/.env.example` to `.env` and set
+one of:
+
+- **Groq** (what this project runs on) — set `AI_API_KEY` to a `gsk_` key
+  from [console.groq.com](https://console.groq.com/keys). `AI_BASE_URL` and
+  `AI_MODEL` already default to Groq and `openai/gpt-oss-120b`. On the free
+  tier keep `AI_MAX_TOKENS` at 3000 — the tier allows 8,000 tokens per
+  minute, and a larger value makes one request exceed it.
+- **xAI / OpenRouter / Ollama** — same `AI_API_KEY`, with `AI_BASE_URL` and
+  `AI_MODEL` pointed at that service.
+- **Anthropic** — `ANTHROPIC_API_KEY`; the model is set by `ANTHROPIC_MODEL`
+  (default `claude-sonnet-5`).
+
+The provider is chosen automatically from whichever key is present, and
+`AI_PROVIDER` overrides it. `GET /health` on either service reports which
+provider is active.
+
+**4. Start the frontend** in a third terminal:
 
 ```bash
 cd apps/web
@@ -163,16 +197,19 @@ The System Status page reports backend and database connectivity. In local
 development the frontend reaches the API through the Vite dev-server proxy,
 which forwards `/health` and `/api` to port 4000.
 
-Verify the backend directly:
+Verify the services directly:
 
 ```bash
-curl http://localhost:4000/health
+curl http://localhost:4000/health          # reports database and AI service status
 curl http://localhost:4000/api/v1/projects
+curl http://127.0.0.1:8000/health          # AI service, reports active provider
 ```
 
 The API starts even without `DATABASE_URL` — `/health` then reports
 `"database": "unavailable"` and `/api/v1` endpoints return HTTP 503, so the
-portal stays runnable and reports the problem honestly.
+portal stays runnable and reports the problem honestly. Likewise, if the AI
+service is down, `/health` reports it and analysis returns HTTP 503 with the
+attempt recorded as a failed run.
 
 Scripts: `npm run dev`, `npm run build`, `npm run typecheck` in both
 projects; `npm run migrate` and `npm run seed` in `apps/api`.

@@ -1,7 +1,7 @@
 # API Design
 
-**Status:** Planned conventions + current actual status. `GET /health` and
-the procurement project endpoints are implemented as of Milestone 2; every
+**Status:** Planned conventions + current actual status. Health, project,
+and requirement-analysis endpoints are implemented as of Milestone 3; every
 other endpoint group below is still planned.
 
 ## Current Status
@@ -19,6 +19,30 @@ Implemented endpoints:
 - `POST /api/v1/projects` — creates a project from `{ title, problemDescription }`.
   Returns 201 with the created project; 400 with per-field details when
   validation fails. New projects are created in the `DRAFT` workflow state.
+
+Requirement analysis endpoints (all nested under a project, all
+organization-scoped):
+
+- `GET /api/v1/projects/:id/requirements` — returns requirements,
+  clarification questions, analysis-run history, and stage history.
+- `POST /api/v1/projects/:id/requirements/analysis` — runs AI analysis
+  synchronously (60s timeout, D30). Persists suggestions, records the run,
+  and moves a `DRAFT` project to `REQUIREMENTS_ANALYSIS`. Returns 409 if the
+  project is past that stage; 503 `AI_SERVICE_UNAVAILABLE` if the AI service
+  cannot be reached, with the run recorded as `FAILED`.
+- `POST /api/v1/projects/:id/requirements` — adds a requirement manually
+  (recorded as `MANUAL`, immediately `ACCEPTED`).
+- `PATCH /api/v1/projects/:id/requirements/:requirementId` — accepts, edits,
+  or rejects. Rejection **requires** a reason; editing preserves the AI's
+  original wording in `original_text`.
+- `POST /api/v1/projects/:id/requirements/clarifications/:questionId/answer`
+- `POST /api/v1/projects/:id/requirements/confirm` — requires at least one
+  accepted requirement (409 `NO_ACCEPTED_REQUIREMENTS`); returns the count of
+  still-unanswered clarifications as a warning (D33).
+- `POST /api/v1/projects/:id/requirements/reopen` — returns a confirmed
+  project to `REQUIREMENTS_ANALYSIS` (D34).
+
+`GET /health` additionally reports `aiService`, `aiProvider`, and `aiModel`.
 
 All `/api/v1` endpoints currently act as the seeded official (D21) — there
 is no authentication yet. They return 503 `DATABASE_NOT_CONFIGURED` when
@@ -45,7 +69,9 @@ above already follow them; the remainder are planned.
 - **Error format:** `{ error: { code, message, details? } }` (D24).
   `details` is an array of `{ field, message }` for validation failures.
   Codes in use: `VALIDATION_ERROR`, `NOT_FOUND`, `DATABASE_NOT_CONFIGURED`,
-  `SEED_DATA_MISSING`, `INTERNAL_ERROR`.
+  `SEED_DATA_MISSING`, `INTERNAL_ERROR`, `AI_SERVICE_UNAVAILABLE`,
+  `AI_SERVICE_ERROR`, `AI_OUTPUT_INVALID`, `INVALID_STATE_TRANSITION`,
+  `NO_ACCEPTED_REQUIREMENTS`.
 - **Status codes:** standard HTTP status codes used semantically (2xx
   success, 4xx client error, 5xx server error).
 
@@ -72,8 +98,14 @@ methods, and payloads are not yet designed.
   Pydantic models.
 - The AI service is not exposed to the frontend directly (see
   [architecture.md](architecture.md)).
-- Internal API contract between `apps/api` and `apps/ai-service` is
-  **unresolved** — to be designed alongside the first AI feature.
+- Implemented as `POST /internal/v1/requirement-analysis` on the AI service.
+  Request and response are Pydantic-validated there, and the response is
+  **re-validated with zod** in Express before anything is persisted — AI
+  output is never trusted on a single validation (NFR2).
+- Invalid AI output produces 502 `AI_OUTPUT_INVALID`; an unreachable service
+  produces 503 `AI_SERVICE_UNAVAILABLE`.
+- The AI service binds to `127.0.0.1` only and has no authentication of its
+  own; Express is its sole caller.
 
 ## Related Documents
 

@@ -1,9 +1,10 @@
 # Database Design
 
-**Status:** Partially implemented. Milestone 2 created the first three
-tables — `organizations`, `users`, and `procurement_projects` — plus a
-`schema_migrations` tracking table. Every other data area below remains
-conceptual and undesigned.
+**Status:** Partially implemented. Milestone 2 created `organizations`,
+`users`, and `procurement_projects`; Milestone 3 added
+`requirement_analysis_runs`, `project_requirements`,
+`clarification_questions`, and `project_stage_history`. Every other data area
+below remains conceptual and undesigned.
 
 This document maps the data areas implied by the product requirements and
 architecture. The Implemented Schema section below reflects what actually
@@ -39,6 +40,27 @@ Defined in `apps/api/migrations/001_init.sql`:
   [../design/procurement-workflow.md](../design/procurement-workflow.md)
   (D22). Only `DRAFT` is currently reachable.
 - `schema_migrations` — applied-migration tracking for the runner.
+
+Added in Milestone 3 (`apps/api/migrations/002_requirement_analysis.sql`):
+
+- `requirement_analysis_runs` — one row per analysis attempt: `status`
+  (PENDING/SUCCEEDED/FAILED), `provider`, `model`, `prompt_version`,
+  `error_message`, `triggered_by`, timestamps. Re-running never overwrites a
+  prior run (D31), and failures are recorded rather than lost.
+- `project_requirements` — requirements and constraints with full
+  provenance: `kind`, `category`, `text`, `rationale`, `source`
+  (AI_SUGGESTED/MANUAL), `status` (SUGGESTED/ACCEPTED/REJECTED),
+  `analysis_run_id`, `original_text`, `rejection_reason`, `decided_by`.
+  A CHECK constraint enforces that a REJECTED row carries a reason.
+- `clarification_questions` — `question`, `rationale`, `status`
+  (OPEN/ANSWERED/DISMISSED), `answer_text`, `answered_by`. A CHECK constraint
+  enforces that an ANSWERED row carries an answer.
+- `project_stage_history` — append-only workflow transitions:
+  `from_status`, `to_status`, `actor_id`, `reason`, `created_at` (D32).
+
+Supporting enums: `analysis_run_status`, `requirement_kind`,
+`requirement_category`, `requirement_source`, `requirement_status`,
+`clarification_status`.
 
 ## Conceptual Data Areas (Not Yet Designed in Detail)
 
@@ -158,8 +180,14 @@ that resulted from it**, and vice versa — an official-confirmed record
 should be traceable back to the AI suggestion(s) it was derived from, where
 applicable.
 
-A single status column (e.g. `suggested` / `approved` / `rejected`) is
-**not assumed to be sufficient** for every case — some domains may need it,
+**For requirements (implemented, D28)** the chosen mechanism is a single
+table with provenance columns: `source` distinguishes AI-suggested from
+manually authored, `status` carries the review decision, `analysis_run_id`
+links back to the run that produced it, and `original_text` preserves the
+AI's wording so an edited item remains traceable to what was suggested.
+
+For every other data area, a single status column is
+**not assumed to be sufficient** — some domains may need it,
 others may need separate suggestion vs. confirmed entities, or a versioned
 record of edits between suggestion and approval. Which approach fits which
 data area (status-based, separate-entity, or version-based) is a per-domain

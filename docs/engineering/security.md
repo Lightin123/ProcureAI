@@ -38,8 +38,24 @@ header, which would be trivially spoofable. Project queries are already
 scoped by `organization_id`, so the authorization boundary has a place to
 attach when auth arrives.
 
-The database connection string lives in `apps/api/.env`, which is excluded
-by `.gitignore` and must never be committed.
+The database connection string lives in `apps/api/.env`, and the Anthropic
+API key (when used) in `apps/ai-service/.env`. Both are excluded by
+`.gitignore` and must never be committed or logged.
+
+**AI-specific considerations introduced in Milestone 3:**
+
+- **Prompt injection.** A project's problem description is official-supplied
+  text that is placed into an LLM prompt. The system prompt instructs the
+  model to treat it strictly as data and ignore embedded instructions, and
+  the structured-output schema constrains what the model can return. The
+  decisive control remains the product rule that nothing AI-generated enters
+  confirmed state without human approval.
+- **Double validation.** AI output is validated by Pydantic in the AI service
+  and re-validated with zod in Express before persistence (NFR2).
+- **Service exposure.** The AI service binds to `127.0.0.1` only and has no
+  authentication of its own; Express is its sole caller, and the frontend
+  never reaches it. If it is ever bound to a routable interface, it will need
+  its own authentication first.
 
 ## Explicitly Out of Scope For Now
 

@@ -1,6 +1,6 @@
 # Development Roadmap
 
-**Status:** Milestones 0, 1, and 2 are complete. Milestone 3 onward is
+**Status:** Milestones 0 through 3 are complete. Milestone 4 onward is
 planned sequencing only.
 
 ## Milestone 0 — Documentation Foundation (Complete)
@@ -61,14 +61,33 @@ cd apps/api && npm install && npm run migrate && npm run seed && npm run dev
 cd apps/web && npm install && npm run dev
 ```
 
-## Milestone 3 — AI Requirement Analysis (Next, Not Detailed)
+## Milestone 3 — AI Requirement Analysis (Complete)
 
-- Scaffold `apps/ai-service` (FastAPI + Pydantic).
-- Implement requirement extraction and clarification-question generation,
-  called from `apps/api`.
-- Structured requirements review/approval UI.
+```
+Run AI analysis -> review suggestions -> answer clarifications -> confirm requirements
+```
 
-## Milestone 4 — Work Packages and Vendor Discovery (Planned, Not Detailed)
+- [x] Scaffold `apps/ai-service` (FastAPI + Pydantic, venv + requirements.txt).
+- [x] Requirement extraction, constraint identification, missing-information
+      detection, and clarification-question generation, called from `apps/api`.
+- [x] Anthropic provider (model configurable, default `claude-sonnet-5`) plus
+      a deterministic stub provider so the platform runs without an API key.
+- [x] Structured requirements review UI: accept, edit, reject-with-reason,
+      add manually, answer clarifications, confirm, reopen.
+- [x] `project_stage_history` records every workflow transition.
+
+Delivers FR2.1–FR2.6. Analysis runs synchronously (D30); no background job
+infrastructure was introduced.
+
+Running it locally adds a third process:
+
+```
+cd apps/ai-service && .venv/Scripts/python -m uvicorn app.main:app --port 8000
+cd apps/api && npm run migrate && npm run dev
+cd apps/web && npm run dev
+```
+
+## Milestone 4 — Work Packages and Vendor Discovery (Next, Not Detailed)
 
 - Work package generation.
 - Vendor data model and semantic search via pgvector.

@@ -42,20 +42,22 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1 and 2 are complete. Full status:
+Milestones 1, 2, and 3 are complete. Full status:
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
 [docs/development-roadmap.md](docs/development-roadmap.md).
 
-Implemented: React portal + Express API + PostgreSQL; procurement projects
-can be created, listed, and viewed. Next up is Milestone 3 (AI requirement
-analysis) — not started.
+Implemented: React portal + Express API + PostgreSQL + FastAPI AI service.
+Officials can create projects, run AI requirement analysis, review and edit
+suggestions, answer clarifications, and confirm requirements. Next up is
+Milestone 4 (work packages and vendor discovery) — not started.
 
 **Do not implement** until explicitly requested:
 - Authentication and RBAC (the acting official is a seeded server-side
   constant — see D21)
-- AI functionality (FastAPI service logic)
-- Vendor functionality
-- Procurement workflow transitions (states are defined; nothing advances yet)
+- Vendor functionality, semantic search, pgvector
+- Work packages / solution components
+- Workflow transitions beyond the three requirement states
+- Background job infrastructure (analysis is synchronous — see D30)
 - Docker, CI/CD, or deployment configuration
 
 ## Development Workflow

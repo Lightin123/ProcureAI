@@ -6,20 +6,21 @@ vision, and marks what is currently implemented.
 
 ## Currently Implemented
 
-Milestones 1 and 2:
+Milestones 1 through 3:
 
 - **Milestone 1** — React frontend and Express backend communicating over
   REST, with `GET /health`.
-- **Milestone 2** — procurement projects persisted in PostgreSQL: an
-  official can create a project with a free-form problem description, see
-  the project register, and open a project's detail page. Projects are
-  created in the `DRAFT` workflow state.
-
-`apps/ai-service` remains an empty placeholder directory.
+- **Milestone 2** — procurement projects persisted in PostgreSQL: create,
+  list, and view, starting in the `DRAFT` workflow state.
+- **Milestone 3** — AI requirement analysis: an official runs analysis on the
+  problem description, reviews suggested requirements and constraints
+  (accept / edit / reject with reason), adds requirements manually, answers
+  clarification questions, and confirms the requirements. All three
+  services now run.
 
 ## Current Development Stage
 
-Milestone 2 is complete. Milestone 3 has not been started — see
+Milestone 3 is complete. Milestone 4 has not been started — see
 [../development-roadmap.md](../development-roadmap.md).
 
 ## Explicitly Out of Scope for the Current Stage
@@ -30,10 +31,9 @@ vision:
 
 - Authentication
 - Role-based access control
-- AI functionality (FastAPI service implementation)
 - Vendor functionality
-- Procurement workflow **transitions** (the state model is defined and
-  projects are created in `DRAFT`, but nothing advances yet)
+- Work packages / solution components (Milestone 4)
+- Workflow transitions beyond the three requirement states
 - Semantic search
 - RAG (retrieval-augmented generation)
 - Document intelligence

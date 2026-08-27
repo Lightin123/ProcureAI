@@ -1,8 +1,36 @@
 # AI System Overview
 
-**Status:** Planned. No AI functionality is implemented yet — this document
-describes the intended design of the AI service and how it fits into the
-platform.
+**Status:** Partially implemented. Requirement extraction, constraint
+identification, missing-information detection, and clarification-question
+generation are implemented as of Milestone 3. Every other capability below
+remains planned.
+
+The service runs on FastAPI at `127.0.0.1:8000` and is called only by the
+Express backend.
+
+## Implemented Capability (Milestone 3)
+
+`POST /internal/v1/requirement-analysis` takes a project title, problem
+description, already-recorded requirements, and answered clarifications, and
+returns validated `requirements` and `clarification_questions`, each with a
+rationale.
+
+Two providers implement the same interface:
+
+- **`anthropic`** — calls Claude through the official `anthropic` Python SDK
+  using structured outputs, so the response is schema-constrained rather than
+  parsed from free text. The model is configurable via `ANTHROPIC_MODEL`
+  (default `claude-sonnet-5`) — see D27 in
+  [../architecture/decisions.md](../architecture/decisions.md).
+- **`stub`** — deterministic keyword-based provider requiring no API key, so
+  the platform stays runnable and demonstrable without credentials (D36).
+
+Selection is automatic: the Anthropic provider is used when
+`ANTHROPIC_API_KEY` is present, otherwise the stub. `AI_PROVIDER` overrides
+this explicitly.
+
+Milestone 3 uses a **fixed pipeline**, not an agentic loop — the official
+controls re-analysis manually (D35, and see [ai-agents.md](ai-agents.md)).
 
 ## Role of AI in the Product
 

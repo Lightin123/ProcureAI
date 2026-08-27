@@ -20,7 +20,10 @@ Milestones 1 through 3:
 
 ## Current Development Stage
 
-Milestone 3 is complete. Milestone 4 has not been started — see
+Milestone 3 is complete. Milestone 4 (work packages) has not been started.
+The roadmap was re-sequenced so authentication and RBAC (Milestone 5) come
+before vendor discovery (Milestone 6) — see D43 in
+[../architecture/decisions.md](../architecture/decisions.md) and
 [../development-roadmap.md](../development-roadmap.md).
 
 ## Explicitly Out of Scope for the Current Stage
@@ -33,6 +36,8 @@ vision:
 - Role-based access control
 - Vendor functionality
 - Work packages / solution components (Milestone 4)
+- Authentication and RBAC (Milestone 5)
+- Vendor discovery, semantic search, pgvector (Milestone 6)
 - Workflow transitions beyond the three requirement states
 - Semantic search
 - RAG (retrieval-augmented generation)

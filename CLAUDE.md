@@ -49,14 +49,14 @@ Milestones 1, 2, and 3 are complete. Full status:
 Implemented: React portal + Express API + PostgreSQL + FastAPI AI service.
 Officials can create projects, run AI requirement analysis, review and edit
 suggestions, answer clarifications, and confirm requirements. Next up is
-Milestone 4 (work packages and vendor discovery) — not started.
+Milestone 4 (work packages) — not started.
 
 **Do not implement** until explicitly requested:
-- Authentication and RBAC (the acting official is a seeded server-side
-  constant — see D21)
-- Vendor functionality, semantic search, pgvector
-- Work packages / solution components
-- Workflow transitions beyond the three requirement states
+- Authentication and RBAC — Milestone 5. The acting official is a seeded
+  server-side constant (D21) until then
+- Vendor functionality, semantic search, pgvector — Milestone 6
+- RFI/proposal collection, document intelligence, evaluation — Milestone 7
+- Workflow transitions beyond `WORK_PACKAGES_CONFIRMED`
 - Background job infrastructure (analysis is synchronous — see D30)
 - Docker, CI/CD, or deployment configuration
 

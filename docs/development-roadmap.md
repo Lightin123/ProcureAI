@@ -87,13 +87,53 @@ cd apps/api && npm run migrate && npm run dev
 cd apps/web && npm run dev
 ```
 
-## Milestone 4 — Work Packages and Vendor Discovery (Next, Not Detailed)
+## Milestone 4 — Work Packages (Next, Not Detailed)
 
-- Work package generation.
-- Vendor data model and semantic search via pgvector.
-- Vendor discovery UI (structured filtering + semantic results).
+Goal: turn confirmed structured requirements into reviewable work packages.
 
-## Milestone 5 — Evaluation and Recommendations (Planned, Not Detailed)
+- Generate work packages from confirmed requirements (FR3.1).
+- Review, edit, accept, reject, add and remove work packages (FR3.2).
+- Allow a project to proceed without decomposition where a single solution
+  is appropriate (FR3.3).
+- Preserve AI provenance and human decisions, consistent with NFR8 and the
+  pattern established for requirements in D28.
+- Introduce work-package-level workflow states (resolves U23) and the
+  transitions that reach `WORK_PACKAGES_CONFIRMED`.
+
+Continues to use the seeded acting official (D21). No authentication, no
+vendor functionality, no pgvector.
+
+## Milestone 5 — Authentication and RBAC (Planned, Not Detailed)
+
+Goal: replace the seeded development identity with real authenticated users
+and enforce authorization.
+
+- Authentication with login, logout and session handling (resolves U3).
+- Real authenticated user identity replacing the server-side constant of D21.
+- Role-based access control covering at least Government Official,
+  Administrator and Vendor (FR10.1), informed by
+  [product/users-and-roles.md](product/users-and-roles.md) and U4.
+- Organization-aware authorization, preserving the existing
+  `organization_id` scoping already enforced in every query (FR10.2).
+- Route and API protection, with permission checks in the backend as the
+  authoritative boundary.
+- Role-aware frontend navigation and access.
+
+Milestones 1–4 are not redesigned; the acting-official resolver is a single
+server-side seam, so this milestone swaps its implementation rather than
+migrating data.
+
+## Milestone 6 — Vendor Discovery and Matching (Planned, Not Detailed)
+
+- Vendor data model and vendor profile data.
+- Vendor onboarding as appropriate, now feasible because vendor
+  representatives can hold real accounts after Milestone 5 (bears on U5).
+- Structured vendor filtering.
+- Semantic search using pgvector where justified (bears on U14).
+- Vendor discovery UI and matching vendors to work packages.
+- AI-assisted vendor relevance features that fit the existing architecture.
+
+## Milestone 7 — Evaluation and Recommendations (Planned, Not Detailed)
 
 - RFI/proposal collection and document intelligence.
 - Evaluation scoring (deterministic + AI-assisted).
@@ -102,9 +142,11 @@ cd apps/web && npm run dev
 
 ## Notes
 
-- This roadmap is a reasonable default sequencing based on the core system
-  flow in [product/problem-statement.md](product/problem-statement.md); it
-  has not been reviewed/approved milestone-by-milestone beyond Milestone 1.
+- Sequencing follows the core system flow in
+  [product/problem-statement.md](product/problem-statement.md), with one
+  deliberate departure: authentication and RBAC were moved ahead of vendor
+  work (D43). Vendor representatives need real accounts, so building vendor
+  onboarding before authentication would have required throwaway scaffolding.
 - Each milestone must leave the project runnable, per
   [engineering/development-workflow.md](engineering/development-workflow.md).
 - Milestones beyond Milestone 1 are not scheduled and should be re-scoped

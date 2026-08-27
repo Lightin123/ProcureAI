@@ -149,10 +149,10 @@ Procurement Projects entity in
 | `REQUIREMENTS_ANALYSIS` | AI requirement analysis and clarification are in progress. | Milestone 3 |
 | `REQUIREMENTS_CONFIRMED` | The official has approved the structured requirements. | Milestone 3 |
 | `WORK_PACKAGES_CONFIRMED` | Decomposition is approved, or deliberately skipped under FR3.3. | Milestone 4 |
-| `IN_DISCOVERY` | Vendor discovery and RFI/proposal collection are under way. | Milestone 4 |
-| `UNDER_EVALUATION` | Submitted candidates are being evaluated and ranked. | Milestone 5 |
-| `AWAITING_DECISION` | Explainable recommendations are ready for human review. | Milestone 5 |
-| `DECISION_RECORDED` | The official has recorded the procurement decision (FR9.2). | Milestone 5 |
+| `IN_DISCOVERY` | Vendor discovery and RFI/proposal collection are under way. | Milestone 6 |
+| `UNDER_EVALUATION` | Submitted candidates are being evaluated and ranked. | Milestone 7 |
+| `AWAITING_DECISION` | Explainable recommendations are ready for human review. | Milestone 7 |
+| `DECISION_RECORDED` | The official has recorded the procurement decision (FR9.2). | Milestone 7 |
 | `CANCELLED` | The project was terminated without a procurement decision. | — |
 
 ### Rules

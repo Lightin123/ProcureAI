@@ -231,7 +231,7 @@ Milestones 1 and 2 are implemented:
 - PostgreSQL holds organizations, users, and procurement projects. The
   development database is hosted rather than local (D19). The pgvector
   extension is **not** enabled yet — it is not needed until semantic search
-  in Milestone 4.
+  in Milestone 6.
 
 Not yet implemented: `apps/ai-service` (still an empty directory), file
 storage, and background job processing. Those are described above as target

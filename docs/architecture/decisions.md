@@ -27,7 +27,7 @@ architectural, product, or process decision is made.
 | D17 | In local development the frontend reaches the backend through the Vite dev-server proxy rather than CORS middleware | Keeps requests same-origin in dev, so no CORS dependency or configuration is needed yet. Revisit when the frontend is served from somewhere other than the Vite dev server |
 | D18 | `GET /health` is served unversioned at the root, not under a versioned prefix | Matches the endpoint documented in [api-design.md](api-design.md) and standard health-check convention; deliberately does not pre-empt the still-open versioning decision (U7) |
 | D19 | Development database is **hosted PostgreSQL**, not a local install | No local PostgreSQL is required, which keeps D5 (no Docker) intact. Introduces an external service dependency and requires TLS — see [technology-stack.md](technology-stack.md) |
-| D20 | Data access uses `pg` (node-postgres) with hand-written SQL and plain `.sql` migrations; no ORM. Resolves **U1** | Fewest dependencies, no codegen, transparent SQL, and unconstrained pgvector use in Milestone 4. Migrations are tracked in a `schema_migrations` table by a small runner (`npm run migrate`) |
+| D20 | Data access uses `pg` (node-postgres) with hand-written SQL and plain `.sql` migrations; no ORM. Resolves **U1** | Fewest dependencies, no codegen, transparent SQL, and unconstrained pgvector use when semantic search arrives. Migrations are tracked in a `schema_migrations` table by a small runner (`npm run migrate`) |
 | D21 | Until authentication exists, the acting official is resolved **server-side** from a seeded user constant | Gives `created_by` / `organization_id` real values from the first schema, so adding auth later is wiring rather than migration. Deliberately not a client-supplied identity header, which would be spoofable |
 | D22 | Procurement projects use a fixed 9-state workflow enum (`DRAFT` … `CANCELLED`) | Defined once in [../design/procurement-workflow.md](../design/procurement-workflow.md) so later milestones extend behaviour rather than widening the state model. Only `DRAFT` is reachable in Milestone 2 |
 | D23 | API application endpoints are served under `/api/v1`. Resolves **U7** | First real endpoints (`/api/v1/projects`) needed a prefix; `/health` remains unversioned per D18 |
@@ -50,30 +50,33 @@ architectural, product, or process decision is made.
 | D40 | OpenAI-compatible output uses JSON mode plus Pydantic validation and a bounded retry (`AI_MAX_ATTEMPTS`, default 2) | These endpoints honour JSON schemas less strictly than Anthropic structured outputs. Output that never validates is rejected rather than passed on, satisfying NFR2 |
 | D41 | Groq is the project's working LLM provider: `AI_BASE_URL=https://api.groq.com/openai/v1`, `AI_MODEL=openai/gpt-oss-120b`, `AI_MAX_TOKENS=3000` | The only LLM credential available is a Groq free-tier key. The model was chosen from what that key can actually reach — `llama-3.3-70b-versatile` is **not** in Groq's current catalogue. Anthropic and stub providers remain available and unchanged |
 | D42 | The provider prompt states the output shape compactly instead of embedding the generated JSON Schema | Groq's free tier caps throughput at 8,000 tokens per minute, and the schema dump consumed roughly a quarter of that per call for no accuracy gain. Cut the system prompt by ~48% |
+| D43 | Roadmap re-sequenced: M4 Work Packages, M5 Authentication & RBAC, M6 Vendor Discovery, M7 Evaluation. Authentication moves ahead of vendor work | Vendor representatives need real accounts (see [../product/users-and-roles.md](../product/users-and-roles.md)), so building vendor onboarding before authentication would mean throwaway scaffolding. Work packages depend only on confirmed requirements, so they remain safe to build under the seeded identity (D21). The cost is that M5 must retrofit permission checks across M2–M4 endpoints; this is contained because ownership columns already exist and identity resolves through a single server-side seam |
 
 ## Open / Unresolved Decisions
 
 | # | Question | Notes |
 |---|---|---|
 | U2 | Detailed database schema | Deferred until PostgreSQL integration is requested |
-| U3 | Authentication mechanism (session vs. JWT, provider) | Deferred until auth is requested |
-| U4 | Whether "Government Administrator" and "Procurement Administrator" are distinct roles | See [../product/users-and-roles.md](../product/users-and-roles.md) |
-| U5 | Whether vendor self-service is in hackathon scope or a future extension | See [../product/hackathon-scope.md](../product/hackathon-scope.md) |
+| U3 | Authentication mechanism (session vs. JWT, provider) | Due in Milestone 5 (D43) |
+| U4 | Whether "Government Administrator" and "Procurement Administrator" are distinct roles | Due in Milestone 5, when the role model is implemented (D43). See [../product/users-and-roles.md](../product/users-and-roles.md) |
+| U5 | Whether vendor self-service is in hackathon scope or a future extension | Due in Milestone 6. Now tractable because authentication lands first (D43), so vendor representatives can hold real accounts |
 | U9 | File/object storage provider for uploaded documents (local filesystem now; object storage e.g. S3-compatible later) | Component is named in [architecture.md](architecture.md); specific technology not yet chosen |
 | U10 | Testing frameworks per component | Still open. Milestone 2 was verified by typecheck, build, SSR route smoke tests, and manual API checks — no test framework adopted yet. See [../engineering/testing-strategy.md](../engineering/testing-strategy.md) |
 | U11 | CI/CD tooling and pipeline | Explicitly out of scope for now |
 | U12 | Deployment target (if any) for hackathon demo | See [../engineering/deployment.md](../engineering/deployment.md) |
 | U13 | Performance/scale targets | See NFR9 in [../product/requirements.md](../product/requirements.md) |
-| U14 | Embedding model, vector dimensionality, and pgvector indexing strategy | See [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md) |
+| U14 | Embedding model, vector dimensionality, and pgvector indexing strategy | Due in Milestone 6 (D43). See [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md) |
 | U16 | Background/async job processing mechanism | Still open. Milestone 3 runs analysis synchronously (D30); revisit when a genuinely long-running workload arrives |
 | U17 | Frontend job-status delivery mechanism | Still open, and not needed while analysis is synchronous (D30) |
 | U18 | Organization/department scoping model (strict hierarchy vs. flat, single-org-per-user vs. multi-org membership) | See [database.md](database.md) |
 | U19 | Relationship between Organization Memberships and the global role model | See [database.md](database.md) and [../product/users-and-roles.md](../product/users-and-roles.md) |
-| U20 | Mechanism for AI-suggestion-to-confirmed-state traceability in data areas **other than requirements** | Requirements resolved by D28 (status + provenance columns). Work packages, document extractions, and evaluations still decide independently — see [database.md](database.md) |
+| U20 | Mechanism for AI-suggestion-to-confirmed-state traceability in data areas **other than requirements** | Requirements resolved by D28 (status + provenance columns). **Due for work packages in Milestone 4**; document extractions and evaluations decide later — see [database.md](database.md) |
 | U21 | Retention and comparison UX for multiple Evaluation / Recommendation Runs | See [database.md](database.md) and [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md) |
-| U22 | Permitted backward workflow transitions **other than** confirmed-to-analysis | `REQUIREMENTS_CONFIRMED -> REQUIREMENTS_ANALYSIS` is defined by D34; later pairs are defined by the milestone that introduces them |
-| U23 | Work-package-level workflow states | Separate from project states; to be defined with work packages in Milestone 4 |
+| U22 | Permitted backward workflow transitions **other than** confirmed-to-analysis | `REQUIREMENTS_CONFIRMED -> REQUIREMENTS_ANALYSIS` is defined by D34. **Milestone 4 must define whether `WORK_PACKAGES_CONFIRMED` can return to `REQUIREMENTS_CONFIRMED`** |
+| U23 | Work-package-level workflow states | Separate from project states; **due in Milestone 4**. Workflow Principle 5 requires work packages to progress independently once confirmed |
 | U24 | Reference-number allocation strategy under concurrency | Milestone 2 uses `PRJ-<year>-<sequence>` derived from `MAX(split_part(...))`. Correct sequentially, but two simultaneous inserts can collide on the unique constraint. Adequate for single-user development; replace with a sequence or retry-on-conflict before multi-user use |
+| U27 | Whether work packages need their own reference numbers, and if so their format | Raised by Milestone 4. Projects use `PRJ-<year>-<sequence>`; work packages may warrant a derived identifier |
+| U28 | Whether existing seeded-identity data needs migrating when real authentication lands | Raised by D43. The seeded official is a real `users` row, so existing projects may simply be re-pointed, but this needs deciding in Milestone 5 |
 | U25 | Whether the Anthropic provider's prompt and output quality need tuning against real procurement descriptions | The provider is implemented and structurally verified, but has not been exercised against the live Anthropic API — no API key was configured during Milestone 3 |
 | U26 | Whether editing a MANUAL requirement should be tracked distinctly | `edited` currently means "diverged from the AI's original wording", so it stays false for manually authored items. Adequate today; revisit if manual edit history is needed |
 

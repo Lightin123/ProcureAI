@@ -19,7 +19,7 @@ them.
 - Data access is `pg` with hand-written SQL and plain `.sql` migrations —
   no ORM (D20).
 - The pgvector extension will be used for embeddings-based semantic search.
-  It is **not enabled yet**; it is not needed until Milestone 4.
+  It is **not enabled yet**; it is not needed until Milestone 6.
 - The Express backend (`apps/api`) is the only component with direct
   database access.
 

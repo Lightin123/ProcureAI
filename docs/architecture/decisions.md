@@ -26,21 +26,26 @@ architectural, product, or process decision is made.
 | D16 | Local development ports: Express API on `4000`, Vite dev server on `5173` | Vite's default for the frontend; a distinct, unused port for the API. API port is overridable via the `PORT` environment variable |
 | D17 | In local development the frontend reaches the backend through the Vite dev-server proxy rather than CORS middleware | Keeps requests same-origin in dev, so no CORS dependency or configuration is needed yet. Revisit when the frontend is served from somewhere other than the Vite dev server |
 | D18 | `GET /health` is served unversioned at the root, not under a versioned prefix | Matches the endpoint documented in [api-design.md](api-design.md) and standard health-check convention; deliberately does not pre-empt the still-open versioning decision (U7) |
+| D19 | Development database is **hosted PostgreSQL**, not a local install | No local PostgreSQL is required, which keeps D5 (no Docker) intact. Introduces an external service dependency and requires TLS — see [technology-stack.md](technology-stack.md) |
+| D20 | Data access uses `pg` (node-postgres) with hand-written SQL and plain `.sql` migrations; no ORM. Resolves **U1** | Fewest dependencies, no codegen, transparent SQL, and unconstrained pgvector use in Milestone 4. Migrations are tracked in a `schema_migrations` table by a small runner (`npm run migrate`) |
+| D21 | Until authentication exists, the acting official is resolved **server-side** from a seeded user constant | Gives `created_by` / `organization_id` real values from the first schema, so adding auth later is wiring rather than migration. Deliberately not a client-supplied identity header, which would be spoofable |
+| D22 | Procurement projects use a fixed 9-state workflow enum (`DRAFT` … `CANCELLED`) | Defined once in [../design/procurement-workflow.md](../design/procurement-workflow.md) so later milestones extend behaviour rather than widening the state model. Only `DRAFT` is reachable in Milestone 2 |
+| D23 | API application endpoints are served under `/api/v1`. Resolves **U7** | First real endpoints (`/api/v1/projects`) needed a prefix; `/health` remains unversioned per D18 |
+| D24 | Error responses use `{ error: { code, message, details? } }`. Resolves **U8** | Matches the shape already sketched in [api-design.md](api-design.md); `details` carries per-field validation messages |
+| D25 | Request validation at the API boundary uses `zod` | Directly serves NFR3 and the CLAUDE.md rule that all external input is validated; hand-written guards do not scale past a couple of endpoints |
+| D26 | Frontend routing uses `react-router-dom` | Milestone 2 introduces multiple URL-addressable screens, and [../design/ui-design.md](../design/ui-design.md) mandates breadcrumbs and a stable page hierarchy |
 
 ## Open / Unresolved Decisions
 
 | # | Question | Notes |
 |---|---|---|
-| U1 | ORM choice for `apps/api` (e.g. Prisma) vs. raw SQL | Explicitly deferred until PostgreSQL integration is requested |
 | U2 | Detailed database schema | Deferred until PostgreSQL integration is requested |
 | U3 | Authentication mechanism (session vs. JWT, provider) | Deferred until auth is requested |
 | U4 | Whether "Government Administrator" and "Procurement Administrator" are distinct roles | See [../product/users-and-roles.md](../product/users-and-roles.md) |
 | U5 | Whether vendor self-service is in hackathon scope or a future extension | See [../product/hackathon-scope.md](../product/hackathon-scope.md) |
 | U6 | Specific LLM provider(s)/model(s) for the AI service | Not yet discussed |
-| U7 | API base path / versioning prefix | See [api-design.md](api-design.md) |
-| U8 | Error response shape convention | See [api-design.md](api-design.md) |
 | U9 | File/object storage provider for uploaded documents (local filesystem now; object storage e.g. S3-compatible later) | Component is named in [architecture.md](architecture.md); specific technology not yet chosen |
-| U10 | Testing frameworks per component | See [../engineering/testing-strategy.md](../engineering/testing-strategy.md) |
+| U10 | Testing frameworks per component | Still open. Milestone 2 was verified by typecheck, build, SSR route smoke tests, and manual API checks — no test framework adopted yet. See [../engineering/testing-strategy.md](../engineering/testing-strategy.md) |
 | U11 | CI/CD tooling and pipeline | Explicitly out of scope for now |
 | U12 | Deployment target (if any) for hackathon demo | See [../engineering/deployment.md](../engineering/deployment.md) |
 | U13 | Performance/scale targets | See NFR9 in [../product/requirements.md](../product/requirements.md) |
@@ -51,6 +56,9 @@ architectural, product, or process decision is made.
 | U19 | Relationship between Organization Memberships and the global role model | See [database.md](database.md) and [../product/users-and-roles.md](../product/users-and-roles.md) |
 | U20 | Mechanism for AI-suggestion-to-confirmed-state traceability per data area (status-based, separate-entity, or version-based) | See "AI Suggestions vs. Confirmed State" in [database.md](database.md) |
 | U21 | Retention and comparison UX for multiple Evaluation / Recommendation Runs | See [database.md](database.md) and [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md) |
+| U22 | Permitted backward workflow transitions (which earlier states a project may return to, and under what conditions) | Raised by the state model in [../design/procurement-workflow.md](../design/procurement-workflow.md); defer to the milestone that introduces each transition |
+| U23 | Work-package-level workflow states | Separate from project states; to be defined with work packages in Milestone 4 |
+| U24 | Reference-number allocation strategy under concurrency | Milestone 2 uses `PRJ-<year>-<sequence>` derived from `MAX(split_part(...))`. Correct sequentially, but two simultaneous inserts can collide on the unique constraint. Adequate for single-user development; replace with a sequence or retry-on-conflict before multi-user use |
 
 ## How to Use This Log
 

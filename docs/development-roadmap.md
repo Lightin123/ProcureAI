@@ -1,7 +1,7 @@
 # Development Roadmap
 
-**Status:** Milestones 0 and 1 are complete. Milestone 2 onward is planned
-sequencing only.
+**Status:** Milestones 0, 1, and 2 are complete. Milestone 3 onward is
+planned sequencing only.
 
 ## Milestone 0 — Documentation Foundation (Complete)
 
@@ -32,16 +32,36 @@ cd apps/api && npm install && npm run dev     # http://localhost:4000
 cd apps/web && npm install && npm run dev     # http://localhost:5173
 ```
 
-## Milestone 2 — Procurement Project Skeleton (Next, Not Detailed)
+## Milestone 2 — Procurement Project Skeleton (Complete)
 
-- Introduce PostgreSQL integration and initial schema for procurement
-  projects (see [architecture/database.md](architecture/database.md)).
-- Basic CRUD for procurement projects (create, view) without AI or
-  evaluation logic yet.
-- Likely introduces authentication, since project data becomes
-  user-specific — exact sequencing not yet decided.
+```
+Create / list / view procurement projects, persisted in PostgreSQL
+```
 
-## Milestone 3 — AI Requirement Analysis (Planned, Not Detailed)
+- [x] PostgreSQL integration via `pg` with plain SQL migrations (D20);
+      hosted development database (D19).
+- [x] Initial schema: `organizations`, `users`, `procurement_projects`
+      (see [architecture/database.md](architecture/database.md)).
+- [x] Nine-state project workflow enum defined (D22); projects created in
+      `DRAFT`.
+- [x] `GET /api/v1/projects`, `GET /api/v1/projects/:id`,
+      `POST /api/v1/projects` with `zod` validation.
+- [x] Frontend routing plus Projects list, detail, and create screens.
+- [x] `GET /health` extended to report database connectivity.
+
+**Authentication was deliberately not introduced.** Ownership is modelled
+(`created_by`, `organization_id`) and the acting official is resolved
+server-side from a seeded constant (D21), so authentication becomes a
+wiring change later rather than a schema migration.
+
+Running it locally, after setting `DATABASE_URL` in `apps/api/.env`:
+
+```
+cd apps/api && npm install && npm run migrate && npm run seed && npm run dev
+cd apps/web && npm install && npm run dev
+```
+
+## Milestone 3 — AI Requirement Analysis (Next, Not Detailed)
 
 - Scaffold `apps/ai-service` (FastAPI + Pydantic).
 - Implement requirement extraction and clarification-question generation,

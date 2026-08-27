@@ -41,15 +41,23 @@ supports the "AI output must be structured and validated" principle.
 Rationale: a single relational database serves both structured procurement
 data and vector similarity search, avoiding a separate vector database.
 
-**Unresolved:** whether an ORM/query builder will be used in `apps/api`
-(e.g. Prisma) and the specifics of the migration approach. Explicitly not to
-be decided/implemented until PostgreSQL integration is requested. See
-[database.md](database.md) and [decisions.md](decisions.md).
+Data access uses `pg` (node-postgres) with hand-written SQL — no ORM (D20).
+Schema changes are plain `.sql` files applied in order by a small runner
+(`npm run migrate`) and tracked in a `schema_migrations` table.
+
+The development database is **hosted** PostgreSQL rather than a local
+install (D19). This keeps D5 (no Docker) intact but means development
+depends on an external service and requires TLS; the connection string lives
+in `apps/api/.env`, which is never committed. See [database.md](database.md)
+and [decisions.md](decisions.md).
 
 ## Development Environment
 
-- Local development only.
-- No Docker for this project.
+- Application code runs locally; no Docker.
+- The PostgreSQL development database is hosted externally (D19), so an
+  internet connection is required for database-backed features. Everything
+  else — the web portal and the API process — runs entirely on the
+  developer's machine.
 
 ## Explicitly Excluded
 
@@ -65,8 +73,6 @@ be decided/implemented until PostgreSQL integration is requested. See
 ## Unresolved / Not Yet Decided
 
 - Specific LLM provider(s) and model(s) used by the AI service.
-- Package manager choice for JS/TS projects (npm assumed by default; not
-  explicitly confirmed).
 - Testing frameworks per component (see
   [../engineering/testing-strategy.md](../engineering/testing-strategy.md)).
 - Linting/formatting tooling.

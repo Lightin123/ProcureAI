@@ -103,7 +103,7 @@ government portal does:
   hero band. It should read as "official system," not "product marketing."
 - A persistent, unobtrusive area for **system-wide notices** (e.g.
   scheduled maintenance, policy updates) may render directly beneath the
-  header when active — see [Notices and Alerts](#notices-and-alerts).
+  header when active — see [Notices, Alerts, and Announcements](#notices-alerts-and-announcements).
 
 ## Navigation Patterns
 

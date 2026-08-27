@@ -6,9 +6,9 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 1 (Project Foundation) complete — the React
-> frontend and Express backend are scaffolded and communicating. See
-> [Current Status](#current-status) below.
+> **Project status:** Milestone 2 (Procurement Project Skeleton) complete —
+> procurement projects can be created, listed, and viewed, persisted in
+> PostgreSQL. See [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -109,28 +109,21 @@ for details and rationale.
 
 ## Current Status
 
-**Milestone 1 — Project Foundation: complete.**
+**Milestone 2 — Procurement Project Skeleton: complete.**
 
-```text
-React Frontend
-        │
-        ▼
-Express Backend
-        │
-        ▼
-GET /health
-        │
-        ▼
-Frontend displays backend connection status
-```
+An official can create a procurement project with a free-form problem
+description, view the project register, and open a project's detail page.
+Projects are persisted in PostgreSQL and created in the `DRAFT` workflow
+state.
 
-- `apps/web` — React + TypeScript + Vite. Renders a government-portal-style
-  System Status page showing backend connectivity.
-- `apps/api` — Express + TypeScript. Serves `GET /health`.
+- `apps/web` — React + TypeScript + Vite. Government-portal-style Projects
+  register, project detail, create form, and System Status pages.
+- `apps/api` — Express + TypeScript. `GET /health` plus
+  `/api/v1/projects` (list, detail, create), backed by PostgreSQL via `pg`.
 - `apps/ai-service` — not yet started (Milestone 3).
 
-No authentication, database, AI functionality, or procurement features are
-implemented yet. See
+No authentication, RBAC, AI functionality, vendor discovery, or workflow
+transitions are implemented yet. See
 [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing and
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for what
 is explicitly out of scope until requested.
@@ -139,18 +132,25 @@ is explicitly out of scope until requested.
 
 ## Running Locally
 
-Requires Node.js (developed against v22) and npm. `apps/web` and `apps/api`
-are independent projects, each installed and run separately.
+Requires Node.js (developed against v22), npm, and a PostgreSQL database.
+The development database is hosted rather than installed locally. `apps/web`
+and `apps/api` are independent projects, each installed and run separately.
 
-Start the backend:
+**1. Configure the database.** Copy `apps/api/.env.example` to
+`apps/api/.env` and set `DATABASE_URL` to your PostgreSQL connection string.
+`.env` is gitignored and must never be committed.
+
+**2. Start the backend**, applying migrations and seed data first:
 
 ```bash
 cd apps/api
 npm install
+npm run migrate      # create tables
+npm run seed         # create the development department and official
 npm run dev          # http://localhost:4000
 ```
 
-Then, in a second terminal, start the frontend:
+**3. Start the frontend** in a second terminal:
 
 ```bash
 cd apps/web
@@ -158,18 +158,24 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Open http://localhost:5173 — the System Status page reports whether the
-backend is reachable. In local development the frontend calls `/health`
-through the Vite dev-server proxy, which forwards to the API on port 4000.
+Open http://localhost:5173 — you land on the Procurement Projects register.
+The System Status page reports backend and database connectivity. In local
+development the frontend reaches the API through the Vite dev-server proxy,
+which forwards `/health` and `/api` to port 4000.
 
 Verify the backend directly:
 
 ```bash
 curl http://localhost:4000/health
+curl http://localhost:4000/api/v1/projects
 ```
 
-Available scripts in both projects: `npm run dev`, `npm run build`,
-`npm run typecheck`.
+The API starts even without `DATABASE_URL` — `/health` then reports
+`"database": "unavailable"` and `/api/v1` endpoints return HTTP 503, so the
+portal stays runnable and reports the problem honestly.
+
+Scripts: `npm run dev`, `npm run build`, `npm run typecheck` in both
+projects; `npm run migrate` and `npm run seed` in `apps/api`.
 
 ---
 

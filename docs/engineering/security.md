@@ -24,9 +24,22 @@ explicitly **not implemented** and not to be implemented until requested
 
 ## Current Status
 
-No authentication, authorization, input validation middleware, or audit
-logging exists in the codebase. The only planned endpoint for the current
-milestone (`GET /health`) is intentionally public and requires no auth.
+No authentication, authorization, or audit logging exists in the codebase.
+All endpoints are currently public.
+
+Input validation **is** now implemented: every request body is validated at
+the API boundary with `zod` (D25) before reaching business logic, and
+malformed input is rejected with a structured `VALIDATION_ERROR` response
+(D24).
+
+Until authentication exists, the acting official is resolved **server-side**
+from a seeded user constant (D21) — deliberately not from a client-supplied
+header, which would be trivially spoofable. Project queries are already
+scoped by `organization_id`, so the authorization boundary has a place to
+attach when auth arrives.
+
+The database connection string lives in `apps/api/.env`, which is excluded
+by `.gitignore` and must never be committed.
 
 ## Explicitly Out of Scope For Now
 

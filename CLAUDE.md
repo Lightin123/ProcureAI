@@ -42,22 +42,20 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-We are at the **foundation stage**. Full status:
+Milestones 1 and 2 are complete. Full status:
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
 [docs/development-roadmap.md](docs/development-roadmap.md).
 
-The current milestone is:
-
-```
-React Frontend -> Express Backend -> GET /health -> Frontend displays backend connection status
-```
+Implemented: React portal + Express API + PostgreSQL; procurement projects
+can be created, listed, and viewed. Next up is Milestone 3 (AI requirement
+analysis) — not started.
 
 **Do not implement** until explicitly requested:
-- Authentication
-- Database models / PostgreSQL integration
+- Authentication and RBAC (the acting official is a seeded server-side
+  constant — see D21)
 - AI functionality (FastAPI service logic)
 - Vendor functionality
-- Procurement workflow logic
+- Procurement workflow transitions (states are defined; nothing advances yet)
 - Docker, CI/CD, or deployment configuration
 
 ## Development Workflow

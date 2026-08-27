@@ -16,5 +16,15 @@ def build_provider(settings: Settings) -> RequirementAnalysisProvider:
         logger.info("Using Anthropic provider with model %s", settings.anthropic_model)
         return AnthropicProvider(settings)
 
-    logger.info("Using deterministic stub provider (no Anthropic API key configured)")
+    if provider == "openai_compatible":
+        from app.providers.openai_compatible_provider import OpenAICompatibleProvider
+
+        logger.info(
+            "Using OpenAI-compatible provider at %s with model %s",
+            settings.ai_base_url,
+            settings.ai_model,
+        )
+        return OpenAICompatibleProvider(settings)
+
+    logger.info("Using deterministic stub provider (no API key configured)")
     return StubProvider()

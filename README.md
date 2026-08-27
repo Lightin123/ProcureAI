@@ -121,7 +121,9 @@ clarification questions, and confirms the requirements — moving the project
 - `apps/api` — Express + TypeScript. Health, projects, and requirement
   analysis endpoints, backed by PostgreSQL via `pg`.
 - `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
-  analysis with an Anthropic provider and a deterministic stub provider.
+  analysis with three interchangeable providers selected by configuration:
+  OpenAI-compatible (currently Groq), Anthropic, and a deterministic stub
+  that needs no API key.
 
 Every AI suggestion is reviewable — nothing enters the confirmed record
 without an explicit decision by the official.
@@ -155,8 +157,8 @@ npm run dev          # http://localhost:4000
 ```
 
 **3. Start the AI service** in a second terminal. It runs the deterministic
-stub provider unless an Anthropic API key is configured — no key is needed to
-run or demonstrate the platform:
+stub provider unless an LLM API key is configured — no key is needed to run or
+demonstrate the platform:
 
 ```bash
 cd apps/ai-service
@@ -165,9 +167,22 @@ python -m venv .venv
 .venv/Scripts/python -m uvicorn app.main:app --port 8000
 ```
 
-To use Claude instead, copy `apps/ai-service/.env.example` to `.env` and set
-`ANTHROPIC_API_KEY`. The model is configurable via `ANTHROPIC_MODEL`
-(default `claude-sonnet-5`).
+To use a real model, copy `apps/ai-service/.env.example` to `.env` and set
+one of:
+
+- **Groq** (what this project runs on) — set `AI_API_KEY` to a `gsk_` key
+  from [console.groq.com](https://console.groq.com/keys). `AI_BASE_URL` and
+  `AI_MODEL` already default to Groq and `openai/gpt-oss-120b`. On the free
+  tier keep `AI_MAX_TOKENS` at 3000 — the tier allows 8,000 tokens per
+  minute, and a larger value makes one request exceed it.
+- **xAI / OpenRouter / Ollama** — same `AI_API_KEY`, with `AI_BASE_URL` and
+  `AI_MODEL` pointed at that service.
+- **Anthropic** — `ANTHROPIC_API_KEY`; the model is set by `ANTHROPIC_MODEL`
+  (default `claude-sonnet-5`).
+
+The provider is chosen automatically from whichever key is present, and
+`AI_PROVIDER` overrides it. `GET /health` on either service reports which
+provider is active.
 
 **4. Start the frontend** in a third terminal:
 

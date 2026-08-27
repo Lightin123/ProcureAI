@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import React, { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 
 import { ApiRequestError } from "../api/client.js";
@@ -16,6 +16,17 @@ import {
   type RequirementsView,
 } from "../api/requirements.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
+import { GovernmentAlert } from "../components/GovernmentAlert.js";
+import { GovernmentCard } from "../components/GovernmentCard.js";
+import {
+  RobotIcon,
+  CheckCircleIcon,
+  AlertCircleIcon,
+  PlusIcon,
+  EditIcon,
+  CheckIcon,
+  CloseIcon,
+} from "../components/GovernmentIcons.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
 import { ProjectStatusBadge } from "../components/ProjectStatusBadge.js";
@@ -128,347 +139,425 @@ export function ProjectRequirementsPage() {
           { label: "Home", to: "/" },
           { label: "Procurement Projects", to: "/projects" },
           { label: "Project", to: `/projects/${projectId}` },
-          { label: "Requirements" },
+          { label: "Requirements & AI Analysis" },
         ]}
       />
 
       <PageHeader
-        title="Requirements"
+        title="Requirements & AI Analysis"
+        subtitle="AI-Assisted Requirement Structuring with Human Decision-Making"
         action={view === undefined ? undefined : <ProjectStatusBadge status={status} />}
       />
 
       <ProjectSectionNav projectId={projectId} />
 
-      <p className="page-intro">
-        AI analysis produces suggested requirements and clarification questions. Each
-        suggestion must be reviewed by an official before it becomes part of the
-        confirmed record.
-      </p>
-
       {error !== undefined && (
-        <div className="notice notice--error" role="alert">
-          <p className="notice__title">Action could not be completed</p>
-          <p className="notice__body">{error}</p>
-        </div>
+        <GovernmentAlert type="error" title="Action could not be completed">
+          {error}
+        </GovernmentAlert>
       )}
 
       {notice !== undefined && (
-        <div className="notice notice--info" role="status">
-          <p className="notice__body">{notice}</p>
+        <GovernmentAlert type="success" title="Notification">
+          {notice}
+        </GovernmentAlert>
+      )}
+
+      {loading && (
+        <div style={{ padding: "40px", textAlign: "center", color: "var(--gov-text-secondary)" }}>
+          Loading AI requirements & clarification questions from central server…
         </div>
       )}
 
-      {loading && <p className="panel__message">Loading requirements…</p>}
-
       {view !== undefined && (
         <>
-          <section className="panel" aria-labelledby="analysis-heading">
-            <h2 className="panel__heading" id="analysis-heading">
-              AI Requirement Analysis
-            </h2>
-            <div className="panel__body">
-              <dl className="detail-list">
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Last analysis</dt>
-                  <dd className="detail-list__value">
-                    {latestRun === undefined
-                      ? "Not yet run"
-                      : `${new Date(latestRun.createdAt).toLocaleString("en-IN", { hour12: false })} by ${latestRun.triggeredByName}`}
-                  </dd>
+          {/* AI Requirement Analysis Panel */}
+          <div className="gov-ai-banner">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "16px",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <RobotIcon size={24} />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "18px", color: "var(--gov-primary-dark)", fontWeight: 700 }}>
+                    AI Requirement Analysis Assistant
+                  </h2>
+                  <span style={{ fontSize: "12px", color: "var(--gov-text-secondary)" }}>
+                    Automated extraction, classification, and constraint mapping
+                  </span>
                 </div>
-                {latestRun !== undefined && (
-                  <>
-                    <div className="detail-list__row">
-                      <dt className="detail-list__term">Outcome</dt>
-                      <dd className="detail-list__value">
-                        <StatusBadge
-                          tone={latestRun.status === "SUCCEEDED" ? "operational" : latestRun.status === "FAILED" ? "unavailable" : "pending"}
-                          label={latestRun.status === "SUCCEEDED" ? "Succeeded" : latestRun.status === "FAILED" ? "Failed" : "Pending"}
-                        />
-                        {latestRun.errorMessage !== null && (
-                          <span className="detail-list__note"> {latestRun.errorMessage}</span>
-                        )}
-                      </dd>
+              </div>
+
+              {latestRun !== undefined && (
+                <StatusBadge
+                  tone={latestRun.status === "SUCCEEDED" ? "operational" : latestRun.status === "FAILED" ? "unavailable" : "pending"}
+                  label={latestRun.status === "SUCCEEDED" ? "Analysis Succeeded" : latestRun.status === "FAILED" ? "Analysis Failed" : "Pending"}
+                />
+              )}
+            </div>
+
+            <dl className="gov-desc-list" style={{ marginBottom: "20px" }}>
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Last Analysis Execution</dt>
+                <dd className="gov-desc-val">
+                  {latestRun === undefined
+                    ? "Not yet executed"
+                    : `${new Date(latestRun.createdAt).toLocaleString("en-IN", { hour12: true })}`}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Triggered By Official</dt>
+                <dd className="gov-desc-val">
+                  {latestRun ? latestRun.triggeredByName : "—"}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Model & Provider</dt>
+                <dd className="gov-desc-val gov-desc-val--mono">
+                  {latestRun ? `${latestRun.model ?? "—"} (${latestRun.provider ?? "default"})` : "—"}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Total Analysis Runs</dt>
+                <dd className="gov-desc-val">{view.analysisRuns.length}</dd>
+              </div>
+            </dl>
+
+            {latestRun?.errorMessage && (
+              <GovernmentAlert type="danger" title="Analysis Error">
+                {latestRun.errorMessage}
+              </GovernmentAlert>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="gov-btn gov-btn--primary"
+                disabled={busy || !canAnalyse}
+                onClick={() =>
+                  void perform(
+                    () => runAnalysis(projectId),
+                    "AI Analysis completed. Review the structured suggestions below.",
+                  )
+                }
+              >
+                <RobotIcon size={16} />
+                {busy ? "Running Analysis…" : latestRun === undefined ? "Run AI Analysis" : "Re-run Analysis"}
+              </button>
+
+              {canConfirm && (
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--success"
+                  disabled={busy}
+                  onClick={() =>
+                    void perform(async () => {
+                      const result = await confirmRequirements(projectId);
+                      if (result.unansweredClarifications > 0) {
+                        setNotice(
+                          `Requirements confirmed with ${result.unansweredClarifications} unanswered clarification question(s).`,
+                        );
+                      }
+                    }, "Requirements confirmed and finalized.")
+                  }
+                >
+                  <CheckIcon size={16} />
+                  Confirm Requirements
+                </button>
+              )}
+
+              {canReopen && (
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--tertiary"
+                  disabled={busy}
+                  onClick={() =>
+                    void perform(() => reopenRequirements(projectId), "Requirements reopened for revision.")
+                  }
+                >
+                  Reopen Requirements
+                </button>
+              )}
+            </div>
+
+            {canConfirm && openClarifications.length > 0 && (
+              <div style={{ marginTop: "16px" }}>
+                <GovernmentAlert type="warning" title="Unanswered Clarifications">
+                  {openClarifications.length} question(s) remain unanswered. You may confirm now,
+                  or provide answers below to complete the procurement record.
+                </GovernmentAlert>
+              </div>
+            )}
+          </div>
+
+          {/* Clarification Questions Section */}
+          <GovernmentCard
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <AlertCircleIcon size={20} />
+                <span>Clarification Questions ({view.clarifications.length})</span>
+              </div>
+            }
+            subtitle="AI-detected ambiguities and missing information requiring official inputs"
+          >
+            {view.clarifications.length === 0 && (
+              <p style={{ color: "var(--gov-text-secondary)", fontStyle: "italic", margin: 0 }}>
+                No clarification questions have been raised. Run AI analysis to identify potential gaps.
+              </p>
+            )}
+
+            {view.clarifications.map((question, idx) => (
+              <article className="gov-question-card" key={question.id}>
+                <div className="gov-question-card__header">
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="gov-question-num">Question #{idx + 1}</span>
+                    <span className="gov-tag gov-tag--ai">AI-Suggested</span>
+                  </div>
+                  <StatusBadge
+                    tone={question.status === "ANSWERED" ? "operational" : "pending"}
+                    label={question.status === "ANSWERED" ? "Answered" : "Open"}
+                  />
+                </div>
+
+                <h3 className="gov-question-text">{question.question}</h3>
+
+                {question.rationale !== null && (
+                  <div className="gov-callout-box">
+                    <span className="gov-callout-box__label">Why this matters: </span>
+                    {question.rationale}
+                  </div>
+                )}
+
+                {question.status === "ANSWERED" ? (
+                  <div
+                    style={{
+                      backgroundColor: "var(--gov-success-light)",
+                      border: "1px solid #C8E6C9",
+                      padding: "12px 16px",
+                      borderRadius: "var(--gov-radius)",
+                      marginTop: "10px",
+                    }}
+                  >
+                    <strong style={{ color: "var(--gov-success-dark)", display: "block", marginBottom: "4px" }}>
+                      Official Answer Recorded:
+                    </strong>
+                    <p style={{ margin: 0, color: "var(--gov-text-primary)" }}>{question.answerText}</p>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "14px" }}>
+                    <label
+                      className="gov-form-label"
+                      htmlFor={`answer-${question.id}`}
+                    >
+                      Official Response / Clarification
+                    </label>
+                    <textarea
+                      id={`answer-${question.id}`}
+                      className="gov-form-control"
+                      rows={3}
+                      value={answers[question.id] ?? ""}
+                      placeholder="Type the official answer or department clarification..."
+                      onChange={(event) =>
+                        setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))
+                      }
+                    />
+                    <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--primary gov-btn--sm"
+                        disabled={busy || (answers[question.id] ?? "").trim() === ""}
+                        onClick={() =>
+                          void perform(
+                            () =>
+                              answerClarification(
+                                projectId,
+                                question.id,
+                                (answers[question.id] ?? "").trim(),
+                              ),
+                            "Answer recorded into official project log.",
+                          )
+                        }
+                      >
+                        Save Official Answer
+                      </button>
                     </div>
-                    <div className="detail-list__row">
-                      <dt className="detail-list__term">Model</dt>
-                      <dd className="detail-list__value detail-list__value--mono">
-                        {latestRun.model ?? "—"}
-                        {latestRun.provider !== null ? ` (${latestRun.provider})` : ""}
-                      </dd>
+                  </div>
+                )}
+              </article>
+            ))}
+          </GovernmentCard>
+
+          {/* Requirements & Constraints Section */}
+          <GovernmentCard
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <CheckCircleIcon size={20} />
+                <span>Requirements & Constraints ({view.requirements.length})</span>
+              </div>
+            }
+            subtitle="Review, modify, approve, or reject extracted specifications"
+          >
+            {view.requirements.length === 0 && (
+              <p style={{ color: "var(--gov-text-secondary)", fontStyle: "italic", margin: 0 }}>
+                No requirements recorded yet. Run AI analysis above or add one manually below.
+              </p>
+            )}
+
+            {view.requirements.map((requirement) => (
+              <article className="gov-requirement-card" key={requirement.id}>
+                <div className="gov-requirement-card__header">
+                  {requirement.source === "AI_SUGGESTED" ? (
+                    <span className="gov-tag gov-tag--ai">AI-Suggested</span>
+                  ) : (
+                    <span className="gov-tag gov-tag--manual">Added by Official</span>
+                  )}
+                  <span className="gov-tag gov-tag--meta">
+                    {requirement.kind === "CONSTRAINT" ? "Constraint" : "Requirement"} ·{" "}
+                    {CATEGORY_LABELS[requirement.category] ?? requirement.category}
+                  </span>
+                  <StatusBadge
+                    tone={requirementTone(requirement.status)}
+                    label={requirementLabel(requirement.status)}
+                  />
+                </div>
+
+                {editingId === requirement.id ? (
+                  <div style={{ marginTop: "12px" }}>
+                    <label className="gov-form-label" htmlFor={`edit-${requirement.id}`}>
+                      Edit Specification Text
+                    </label>
+                    <textarea
+                      id={`edit-${requirement.id}`}
+                      className="gov-form-control"
+                      rows={3}
+                      value={editText}
+                      onChange={(event) => setEditText(event.target.value)}
+                    />
+                    <div style={{ marginTop: "10px", display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--tertiary gov-btn--sm"
+                        onClick={() => setEditingId(undefined)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--primary gov-btn--sm"
+                        disabled={busy || editText.trim().length < 5}
+                        onClick={() =>
+                          void perform(async () => {
+                            await decideRequirement(projectId, requirement.id, {
+                              action: "edit",
+                              text: editText.trim(),
+                            });
+                            setEditingId(undefined);
+                          }, "Requirement updated and accepted.")
+                        }
+                      >
+                        Save and Accept
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: "15px", fontWeight: 600, color: "var(--gov-text-primary)", margin: "0 0 8px" }}>
+                      {requirement.text}
+                    </p>
+
+                    {requirement.edited && (
+                      <p style={{ fontSize: "12px", color: "var(--gov-saffron-dark)", margin: "0 0 6px" }}>
+                        Edited by official. Original AI suggestion: “{requirement.originalText}”
+                      </p>
+                    )}
+
+                    {requirement.rationale !== null && (
+                      <div className="gov-callout-box">
+                        <span className="gov-callout-box__label">Technical Basis / Rationale: </span>
+                        {requirement.rationale}
+                      </div>
+                    )}
+
+                    {requirement.rejectionReason !== null && (
+                      <div
+                        style={{
+                          backgroundColor: "var(--gov-danger-light)",
+                          borderLeft: "3px solid var(--gov-danger)",
+                          padding: "8px 12px",
+                          fontSize: "13px",
+                          color: "var(--gov-danger-dark)",
+                          margin: "8px 0 12px",
+                        }}
+                      >
+                        <strong>Rejection Reason: </strong>
+                        {requirement.rejectionReason}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--success gov-btn--sm"
+                        disabled={busy || requirement.status === "ACCEPTED"}
+                        onClick={() =>
+                          void perform(
+                            () => decideRequirement(projectId, requirement.id, { action: "accept" }),
+                            "Requirement approved and accepted.",
+                          )
+                        }
+                      >
+                        <CheckIcon size={14} />
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--secondary gov-btn--sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditingId(requirement.id);
+                          setEditText(requirement.text);
+                        }}
+                      >
+                        <EditIcon size={14} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="gov-btn gov-btn--danger gov-btn--sm"
+                        disabled={busy || requirement.status === "REJECTED"}
+                        onClick={() => setRejecting(requirement)}
+                      >
+                        <CloseIcon size={14} />
+                        Reject
+                      </button>
                     </div>
                   </>
                 )}
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Total analyses</dt>
-                  <dd className="detail-list__value">{view.analysisRuns.length}</dd>
-                </div>
-              </dl>
+              </article>
+            ))}
+          </GovernmentCard>
 
-              <div className="action-row">
-                <button
-                  type="button"
-                  className="button button--primary"
-                  disabled={busy || !canAnalyse}
-                  onClick={() =>
-                    void perform(
-                      () => runAnalysis(projectId),
-                      "Analysis completed. Review the suggestions below.",
-                    )
-                  }
-                >
-                  {busy ? "Analysing…" : latestRun === undefined ? "Run AI Analysis" : "Re-run Analysis"}
-                </button>
-                {canConfirm && (
-                  <button
-                    type="button"
-                    className="button button--primary"
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(async () => {
-                        const result = await confirmRequirements(projectId);
-                        if (result.unansweredClarifications > 0) {
-                          setNotice(
-                            `Requirements confirmed with ${result.unansweredClarifications} unanswered clarification question(s).`,
-                          );
-                        }
-                      }, "Requirements confirmed.")
-                    }
-                  >
-                    Confirm Requirements
-                  </button>
-                )}
-                {canReopen && (
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(() => reopenRequirements(projectId), "Requirements reopened for revision.")
-                    }
-                  >
-                    Reopen Requirements
-                  </button>
-                )}
+          {/* Add Requirement Manually */}
+          <GovernmentCard
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <PlusIcon size={20} />
+                <span>Add Specification Manually</span>
               </div>
-
-              {canConfirm && openClarifications.length > 0 && (
-                <div className="notice notice--warning" role="status">
-                  <p className="notice__title">Unanswered clarification questions</p>
-                  <p className="notice__body">
-                    {openClarifications.length} question(s) remain unanswered. You may still
-                    confirm, but answering them first produces a more complete record.
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel" aria-labelledby="clarifications-heading">
-            <h2 className="panel__heading" id="clarifications-heading">
-              Clarification Questions
-            </h2>
-            <div className="panel__body">
-              {view.clarifications.length === 0 && (
-                <p className="panel__message">No clarification questions have been raised.</p>
-              )}
-              {view.clarifications.map((question) => (
-                <article className="suggestion" key={question.id}>
-                  <div className="suggestion__header">
-                    <span className="suggestion__tag">AI-Suggested</span>
-                    <StatusBadge
-                      tone={question.status === "ANSWERED" ? "operational" : "pending"}
-                      label={question.status === "ANSWERED" ? "Answered" : "Open"}
-                    />
-                  </div>
-                  <p className="suggestion__text">{question.question}</p>
-                  {question.rationale !== null && (
-                    <p className="suggestion__rationale">
-                      <span className="suggestion__rationale-label">Why this matters:</span>{" "}
-                      {question.rationale}
-                    </p>
-                  )}
-                  {question.status === "ANSWERED" ? (
-                    <p className="suggestion__answer">
-                      <span className="suggestion__rationale-label">Answer:</span>{" "}
-                      {question.answerText}
-                    </p>
-                  ) : (
-                    <div className="form-field">
-                      <label className="form-field__label" htmlFor={`answer-${question.id}`}>
-                        Your answer
-                      </label>
-                      <textarea
-                        id={`answer-${question.id}`}
-                        className="form-field__input form-field__textarea"
-                        rows={3}
-                        value={answers[question.id] ?? ""}
-                        onChange={(event) =>
-                          setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))
-                        }
-                      />
-                      <div className="action-row">
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          disabled={busy || (answers[question.id] ?? "").trim() === ""}
-                          onClick={() =>
-                            void perform(
-                              () =>
-                                answerClarification(
-                                  projectId,
-                                  question.id,
-                                  (answers[question.id] ?? "").trim(),
-                                ),
-                              "Answer recorded.",
-                            )
-                          }
-                        >
-                          Save Answer
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel" aria-labelledby="requirements-heading">
-            <h2 className="panel__heading" id="requirements-heading">
-              Requirements and Constraints
-            </h2>
-            <div className="panel__body">
-              {view.requirements.length === 0 && (
-                <p className="panel__message">
-                  No requirements recorded yet. Run AI analysis or add one manually below.
-                </p>
-              )}
-              {view.requirements.map((requirement) => (
-                <article className="suggestion" key={requirement.id}>
-                  <div className="suggestion__header">
-                    {requirement.source === "AI_SUGGESTED" ? (
-                      <span className="suggestion__tag">AI-Suggested</span>
-                    ) : (
-                      <span className="suggestion__tag suggestion__tag--manual">
-                        Added by Official
-                      </span>
-                    )}
-                    <span className="suggestion__meta">
-                      {requirement.kind === "CONSTRAINT" ? "Constraint" : "Requirement"} ·{" "}
-                      {CATEGORY_LABELS[requirement.category] ?? requirement.category}
-                    </span>
-                    <StatusBadge
-                      tone={requirementTone(requirement.status)}
-                      label={requirementLabel(requirement.status)}
-                    />
-                  </div>
-
-                  {editingId === requirement.id ? (
-                    <div className="form-field">
-                      <label className="form-field__label" htmlFor={`edit-${requirement.id}`}>
-                        Requirement text
-                      </label>
-                      <textarea
-                        id={`edit-${requirement.id}`}
-                        className="form-field__input form-field__textarea"
-                        rows={3}
-                        value={editText}
-                        onChange={(event) => setEditText(event.target.value)}
-                      />
-                      <div className="action-row">
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          onClick={() => setEditingId(undefined)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--primary"
-                          disabled={busy || editText.trim().length < 5}
-                          onClick={() =>
-                            void perform(async () => {
-                              await decideRequirement(projectId, requirement.id, {
-                                action: "edit",
-                                text: editText.trim(),
-                              });
-                              setEditingId(undefined);
-                            }, "Requirement updated and accepted.")
-                          }
-                        >
-                          Save and Accept
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="suggestion__text">{requirement.text}</p>
-                      {requirement.edited && (
-                        <p className="suggestion__edited">
-                          Edited from AI suggestion. Original: “{requirement.originalText}”
-                        </p>
-                      )}
-                      {requirement.rationale !== null && (
-                        <p className="suggestion__rationale">
-                          <span className="suggestion__rationale-label">Basis:</span>{" "}
-                          {requirement.rationale}
-                        </p>
-                      )}
-                      {requirement.rejectionReason !== null && (
-                        <p className="suggestion__rejection">
-                          <span className="suggestion__rationale-label">Rejected because:</span>{" "}
-                          {requirement.rejectionReason}
-                        </p>
-                      )}
-                      <div className="action-row">
-                        <button
-                          type="button"
-                          className="button button--primary"
-                          disabled={busy || requirement.status === "ACCEPTED"}
-                          onClick={() =>
-                            void perform(
-                              () => decideRequirement(projectId, requirement.id, { action: "accept" }),
-                              "Requirement accepted.",
-                            )
-                          }
-                        >
-                          Accept
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          disabled={busy}
-                          onClick={() => {
-                            setEditingId(requirement.id);
-                            setEditText(requirement.text);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          disabled={busy || requirement.status === "REJECTED"}
-                          onClick={() => setRejecting(requirement)}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel" aria-labelledby="add-heading">
-            <h2 className="panel__heading" id="add-heading">
-              Add Requirement Manually
-            </h2>
+            }
+            subtitle="Official manual insertion into the procurement record"
+          >
             <form
-              className="panel__body"
               onSubmit={(event: FormEvent) => {
                 event.preventDefault();
                 void perform(async () => {
@@ -478,17 +567,17 @@ export function ProjectRequirementsPage() {
                     text: newText.trim(),
                   });
                   setNewText("");
-                }, "Requirement added.");
+                }, "Requirement added to register.");
               }}
             >
-              <div className="form-row">
-                <div className="form-field">
-                  <label className="form-field__label" htmlFor="new-kind">
-                    Type
+              <div className="gov-form-grid">
+                <div className="gov-form-group">
+                  <label className="gov-form-label" htmlFor="new-kind">
+                    Specification Type
                   </label>
                   <select
                     id="new-kind"
-                    className="form-field__input"
+                    className="gov-form-control"
                     value={newKind}
                     onChange={(event) => setNewKind(event.target.value as RequirementKind)}
                   >
@@ -499,13 +588,14 @@ export function ProjectRequirementsPage() {
                     ))}
                   </select>
                 </div>
-                <div className="form-field">
-                  <label className="form-field__label" htmlFor="new-category">
-                    Category
+
+                <div className="gov-form-group">
+                  <label className="gov-form-label" htmlFor="new-category">
+                    Category Classification
                   </label>
                   <select
                     id="new-category"
-                    className="form-field__input"
+                    className="gov-form-control"
                     value={newCategory}
                     onChange={(event) => setNewCategory(event.target.value as RequirementCategory)}
                   >
@@ -517,63 +607,74 @@ export function ProjectRequirementsPage() {
                   </select>
                 </div>
               </div>
-              <div className="form-field">
-                <label className="form-field__label" htmlFor="new-text">
-                  Requirement text <span className="form-field__required">* required</span>
+
+              <div className="gov-form-group">
+                <label className="gov-form-label" htmlFor="new-text">
+                  Requirement / Constraint Text <span className="gov-form-required">*</span>
                 </label>
                 <textarea
                   id="new-text"
-                  className="form-field__input form-field__textarea"
+                  className="gov-form-control"
                   rows={3}
                   value={newText}
+                  placeholder="State the requirement clearly..."
                   onChange={(event) => setNewText(event.target.value)}
                 />
               </div>
-              <div className="action-row">
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button
                   type="submit"
-                  className="button button--primary"
+                  className="gov-btn gov-btn--primary"
                   disabled={busy || newText.trim().length < 5}
                 >
-                  Add Requirement
+                  <PlusIcon size={16} />
+                  Add Specification
                 </button>
               </div>
             </form>
-          </section>
+          </GovernmentCard>
 
-          <section className="panel" aria-labelledby="history-heading">
-            <h2 className="panel__heading" id="history-heading">
-              Workflow History
-            </h2>
-            <div className="panel__body panel__body--flush">
+          {/* Workflow Audit History */}
+          <GovernmentCard
+            title="Stage Transition Audit Trail"
+            subtitle="Official log of procurement state changes and authorizations"
+          >
+            <div className="gov-table-container">
               {view.stageHistory.length === 0 ? (
-                <p className="panel__message">No stage transitions recorded yet.</p>
+                <p style={{ padding: "20px", margin: 0, color: "var(--gov-text-secondary)", fontStyle: "italic" }}>
+                  No stage transitions recorded yet.
+                </p>
               ) : (
-                <table className="data-table">
+                <table className="gov-table">
                   <thead>
                     <tr>
-                      <th scope="col">From</th>
-                      <th scope="col">To</th>
-                      <th scope="col">By</th>
-                      <th scope="col">Reason</th>
-                      <th scope="col">When</th>
+                      <th scope="col">From Stage</th>
+                      <th scope="col">To Stage</th>
+                      <th scope="col">Authorized Official</th>
+                      <th scope="col">Reason / Notes</th>
+                      <th scope="col">Timestamp</th>
                     </tr>
                   </thead>
                   <tbody>
                     {view.stageHistory.map((entry) => (
                       <tr key={entry.id}>
                         <td>{entry.fromStatus ?? "—"}</td>
-                        <td>{entry.toStatus}</td>
+                        <td style={{ fontWeight: 600, color: "var(--gov-primary-dark)" }}>
+                          {entry.toStatus}
+                        </td>
                         <td>{entry.actorName}</td>
-                        <td>{entry.reason ?? "—"}</td>
-                        <td>{new Date(entry.createdAt).toLocaleString("en-IN", { hour12: false })}</td>
+                        <td style={{ color: "var(--gov-text-secondary)" }}>{entry.reason ?? "—"}</td>
+                        <td style={{ fontSize: "13px", color: "var(--gov-text-secondary)" }}>
+                          {new Date(entry.createdAt).toLocaleString("en-IN", { hour12: true })}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
             </div>
-          </section>
+          </GovernmentCard>
         </>
       )}
 
@@ -586,7 +687,7 @@ export function ProjectRequirementsPage() {
             setRejecting(undefined);
             void perform(
               () => decideRequirement(projectId, target.id, { action: "reject", reason }),
-              "Suggestion rejected.",
+              "Suggestion rejected and recorded.",
             );
           }}
         />

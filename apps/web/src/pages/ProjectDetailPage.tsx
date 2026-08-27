@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { getProject, type ProcurementProject } from "../api/projects.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
+import { GovernmentAlert } from "../components/GovernmentAlert.js";
+import { GovernmentCard } from "../components/GovernmentCard.js";
+import {
+  FileTextIcon,
+  BuildingIcon,
+  UserIcon,
+  CalendarIcon,
+  RobotIcon,
+  ChevronRightIcon,
+} from "../components/GovernmentIcons.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
 import { ProjectStatusBadge } from "../components/ProjectStatusBadge.js";
@@ -13,7 +23,14 @@ type LoadState =
   | { kind: "failed"; message: string };
 
 function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("en-IN", { hour12: false });
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 export function ProjectDetailPage() {
@@ -46,7 +63,7 @@ export function ProjectDetailPage() {
     };
   }, [id, load]);
 
-  const title = state.kind === "loaded" ? state.project.title : "Procurement Project";
+  const title = state.kind === "loaded" ? state.project.title : "Procurement Project Record";
 
   return (
     <>
@@ -54,79 +71,142 @@ export function ProjectDetailPage() {
         items={[
           { label: "Home", to: "/" },
           { label: "Procurement Projects", to: "/projects" },
-          { label: state.kind === "loaded" ? state.project.referenceNumber : "Project" },
+          { label: state.kind === "loaded" ? state.project.referenceNumber : "Project Particulars" },
         ]}
       />
 
       <PageHeader
         title={title}
-        action={state.kind === "loaded" ? <ProjectStatusBadge status={state.project.status} /> : undefined}
+        subtitle="Official Public Procurement Dossier · Ministry of Commerce & Industry"
+        action={
+          state.kind === "loaded" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <ProjectStatusBadge status={state.project.status} />
+              <Link
+                to={`/projects/${state.project.id}/requirements`}
+                className="gov-btn gov-btn--primary"
+              >
+                <RobotIcon size={16} />
+                Open AI Requirements
+              </Link>
+            </div>
+          ) : undefined
+        }
       />
 
       {id !== undefined && <ProjectSectionNav projectId={id} />}
 
-      {state.kind === "loading" && <p className="panel__message">Loading project…</p>}
+      {state.kind === "loading" && (
+        <div style={{ padding: "40px", textAlign: "center", color: "var(--gov-text-secondary)" }}>
+          Loading official project record from procurement database…
+        </div>
+      )}
 
       {state.kind === "failed" && (
-        <div className="notice notice--error" role="alert">
-          <p className="notice__title">Project unavailable</p>
-          <p className="notice__body">{state.message}</p>
-        </div>
+        <GovernmentAlert type="error" title="Project record unavailable">
+          {state.message}
+        </GovernmentAlert>
       )}
 
       {state.kind === "loaded" && (
         <>
-          <section className="panel" aria-labelledby="details-heading">
-            <h2 className="panel__heading" id="details-heading">
-              Project Details
-            </h2>
-            <div className="panel__body">
-              <dl className="detail-list">
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Reference number</dt>
-                  <dd className="detail-list__value detail-list__value--mono">
-                    {state.project.referenceNumber}
-                  </dd>
-                </div>
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Status</dt>
-                  <dd className="detail-list__value">
-                    <ProjectStatusBadge status={state.project.status} />
-                  </dd>
-                </div>
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Department</dt>
-                  <dd className="detail-list__value">{state.project.organizationName}</dd>
-                </div>
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Created by</dt>
-                  <dd className="detail-list__value">{state.project.createdByName}</dd>
-                </div>
-                <div className="detail-list__row">
-                  <dt className="detail-list__term">Created on</dt>
-                  <dd className="detail-list__value">{formatDateTime(state.project.createdAt)}</dd>
-                </div>
-              </dl>
-            </div>
-          </section>
+          {/* Official Project Information Card */}
+          <GovernmentCard
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <BuildingIcon size={20} />
+                <span>Administrative Particulars & Department Details</span>
+              </div>
+            }
+          >
+            <dl className="gov-desc-list">
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Official Reference Number</dt>
+                <dd className="gov-desc-val gov-desc-val--mono">
+                  {state.project.referenceNumber}
+                </dd>
+              </div>
 
-          <section className="panel" aria-labelledby="problem-heading">
-            <h2 className="panel__heading" id="problem-heading">
-              Problem Description
-            </h2>
-            <div className="panel__body">
-              <p className="prose">{state.project.problemDescription}</p>
-            </div>
-          </section>
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Current Workflow Stage</dt>
+                <dd className="gov-desc-val">
+                  <ProjectStatusBadge status={state.project.status} />
+                </dd>
+              </div>
 
-          <div className="notice notice--info">
-            <p className="notice__title">Next step: requirement analysis</p>
-            <p className="notice__body">
-              Open the <Link to={`/projects/${state.project.id}/requirements`}>Requirements</Link>{" "}
-              section to run AI analysis, review the suggested requirements, and confirm
-              them. Later procurement stages are not yet part of the platform.
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Nodal Department / Ministry</dt>
+                <dd className="gov-desc-val">
+                  {state.project.organizationName ?? "Department of Commerce / Public Procurement"}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Procuring Official</dt>
+                <dd className="gov-desc-val">
+                  {state.project.createdByName ?? "Registered Government Officer"}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Record Created On</dt>
+                <dd className="gov-desc-val">
+                  {formatDateTime(state.project.createdAt)}
+                </dd>
+              </div>
+
+              <div className="gov-desc-item">
+                <dt className="gov-desc-term">Procurement Classification</dt>
+                <dd className="gov-desc-val">
+                  Smart Automation & AI Decision Support
+                </dd>
+              </div>
+            </dl>
+          </GovernmentCard>
+
+          {/* Problem Statement & Description */}
+          <GovernmentCard
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <FileTextIcon size={20} />
+                <span>Problem Statement & Requirement Scope</span>
+              </div>
+            }
+          >
+            <div
+              style={{
+                fontSize: "15px",
+                lineHeight: "1.7",
+                color: "var(--gov-text-primary)",
+                backgroundColor: "var(--gov-bg-alt)",
+                padding: "18px 20px",
+                borderRadius: "var(--gov-radius)",
+                border: "1px solid var(--gov-border-light)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {state.project.problemDescription}
+            </div>
+          </GovernmentCard>
+
+          {/* Next Steps Callout */}
+          <GovernmentAlert
+            type="info"
+            title="Next Step: AI Requirement Extraction & Structured Review"
+          >
+            <p style={{ margin: "0 0 10px" }}>
+              To structure this problem into formal functional, technical, timeline, and compliance
+              specifications, navigate to the <strong>Requirements & AI Analysis</strong> section.
             </p>
-          </div>
+            <Link
+              to={`/projects/${state.project.id}/requirements`}
+              className="gov-btn gov-btn--primary gov-btn--sm"
+              style={{ display: "inline-flex" }}
+            >
+              Proceed to Requirements Analysis
+              <ChevronRightIcon size={14} />
+            </Link>
+          </GovernmentAlert>
         </>
       )}
     </>

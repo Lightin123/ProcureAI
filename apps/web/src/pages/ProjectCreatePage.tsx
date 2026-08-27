@@ -1,9 +1,12 @@
-import { useState, type FormEvent } from "react";
+import React, { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ApiRequestError } from "../api/client.js";
 import { createProject } from "../api/projects.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
+import { GovernmentAlert } from "../components/GovernmentAlert.js";
+import { GovernmentCard } from "../components/GovernmentCard.js";
+import { BuildingIcon, PlusIcon } from "../components/GovernmentIcons.js";
 import { PageHeader } from "../components/PageHeader.js";
 
 export function ProjectCreatePage() {
@@ -31,12 +34,12 @@ export function ProjectCreatePage() {
             mapped[detail.field] = detail.message;
           }
           setFieldErrors(mapped);
-          setFormError("The submitted details are not valid. Correct the fields marked below.");
+          setFormError("The submitted details contain validation errors. Please review the highlighted fields below.");
         } else {
           setFormError(error.message);
         }
       } else {
-        setFormError("The project could not be created.");
+        setFormError("The procurement project could not be created.");
       }
       setSubmitting(false);
     }
@@ -48,91 +51,106 @@ export function ProjectCreatePage() {
         items={[
           { label: "Home", to: "/" },
           { label: "Procurement Projects", to: "/projects" },
-          { label: "Create Procurement Project" },
+          { label: "Initiate New Project" },
         ]}
       />
 
-      <PageHeader title="Create Procurement Project" />
-
-      <p className="page-intro">
-        Record a new procurement project. Describe the problem in plain language —
-        structured requirements are prepared at a later stage.
-      </p>
+      <PageHeader
+        title="Initiate Procurement Project"
+        subtitle="Record a new procurement requirement dossier for AI-assisted requirement analysis and vendor discovery."
+      />
 
       {formError !== undefined && (
-        <div className="notice notice--error" role="alert">
-          <p className="notice__title">Project could not be created</p>
-          <p className="notice__body">{formError}</p>
-        </div>
+        <GovernmentAlert type="error" title="Submission Error">
+          {formError}
+        </GovernmentAlert>
       )}
 
-      <form className="panel" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <h2 className="panel__heading">Project Particulars</h2>
-        <div className="panel__body">
-          <div className="form-field">
-            <label className="form-field__label" htmlFor="project-title">
-              Project title <span className="form-field__required">* required</span>
+      <form onSubmit={(event) => void handleSubmit(event)} noValidate>
+        <GovernmentCard
+          title={
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <BuildingIcon size={20} />
+              <span>Procurement Dossier Particulars</span>
+            </div>
+          }
+          subtitle="All fields marked with an asterisk (*) are mandatory for registration"
+        >
+          <div className="gov-form-group">
+            <label className="gov-form-label" htmlFor="project-title">
+              Official Project Title <span className="gov-form-required">*</span>
             </label>
-            <p className="form-field__hint" id="project-title-hint">
-              A short official name for this procurement, for example “Smart Traffic
-              Monitoring for District Roads”.
+            <p className="gov-form-hint" id="project-title-hint">
+              Provide a concise, formal nomenclature (e.g., “AI-Based Traffic Congestion Management System for Urban Municipalities”).
             </p>
             <input
               id="project-title"
-              className={`form-field__input${fieldErrors.title === undefined ? "" : " form-field__input--error"}`}
+              className={`gov-form-control${fieldErrors.title !== undefined ? " gov-form-control--error" : ""}`}
               type="text"
               value={title}
               maxLength={200}
+              placeholder="Enter official project title..."
               aria-describedby="project-title-hint"
               aria-invalid={fieldErrors.title !== undefined}
               onChange={(event) => setTitle(event.target.value)}
             />
-            {fieldErrors.title !== undefined && (
-              <p className="form-field__error" role="alert">
-                {fieldErrors.title}
-              </p>
-            )}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+              {fieldErrors.title !== undefined ? (
+                <span className="gov-form-error">{fieldErrors.title}</span>
+              ) : <span />}
+              <span style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}>
+                {title.length} / 200 characters
+              </span>
+            </div>
           </div>
 
-          <div className="form-field">
-            <label className="form-field__label" htmlFor="project-problem">
-              Problem description <span className="form-field__required">* required</span>
+          <div className="gov-form-group">
+            <label className="gov-form-label" htmlFor="project-problem">
+              Comprehensive Problem Statement & Context <span className="gov-form-required">*</span>
             </label>
-            <p className="form-field__hint" id="project-problem-hint">
-              Describe the problem, its context, and any known constraints such as
-              budget, timeline, or compliance obligations.
+            <p className="gov-form-hint" id="project-problem-hint">
+              Articulate the administrative challenge, operational bottlenecks, technology constraints, budget expectations, timeline requirements, and any regulatory or security mandates.
             </p>
             <textarea
               id="project-problem"
-              className={`form-field__input form-field__textarea${fieldErrors.problemDescription === undefined ? "" : " form-field__input--error"}`}
+              className={`gov-form-control${fieldErrors.problemDescription !== undefined ? " gov-form-control--error" : ""}`}
               value={problemDescription}
-              rows={10}
+              rows={9}
               maxLength={10000}
+              placeholder="Describe the operational challenge in detail..."
               aria-describedby="project-problem-hint"
               aria-invalid={fieldErrors.problemDescription !== undefined}
               onChange={(event) => setProblemDescription(event.target.value)}
             />
-            {fieldErrors.problemDescription !== undefined && (
-              <p className="form-field__error" role="alert">
-                {fieldErrors.problemDescription}
-              </p>
-            )}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+              {fieldErrors.problemDescription !== undefined ? (
+                <span className="gov-form-error">{fieldErrors.problemDescription}</span>
+              ) : <span />}
+              <span style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}>
+                {problemDescription.length} / 10,000 characters
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="form-actions">
-          <button
-            type="button"
-            className="button button--secondary"
-            onClick={() => void navigate("/projects")}
-            disabled={submitting}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="button button--primary" disabled={submitting}>
-            {submitting ? "Saving…" : "Create Project"}
-          </button>
-        </div>
+          <div className="gov-form-actions">
+            <button
+              type="button"
+              className="gov-btn gov-btn--tertiary"
+              onClick={() => void navigate("/projects")}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="gov-btn gov-btn--primary gov-btn--lg"
+              disabled={submitting || !title.trim() || !problemDescription.trim()}
+            >
+              <PlusIcon size={16} />
+              {submitting ? "Registering Record…" : "Register Procurement Project"}
+            </button>
+          </div>
+        </GovernmentCard>
       </form>
     </>
   );

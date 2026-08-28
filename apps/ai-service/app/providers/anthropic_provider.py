@@ -16,8 +16,16 @@ from app.prompts.work_package_decomposition import (
     SYSTEM_PROMPT as WP_SYSTEM_PROMPT,
     build_work_package_prompt,
 )
+from app.prompts.vendor_capability import (
+    PROMPT_VERSION as CAPABILITY_PROMPT_VERSION,
+    SYSTEM_PROMPT as CAPABILITY_SYSTEM_PROMPT,
+    build_user_prompt as build_capability_prompt,
+)
 from app.providers.base import ProviderError
 from app.schemas import (
+    CapabilityInsight,
+    CapabilityInsightsRequest,
+    CapabilityInsightsResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     SuggestedClarification,
@@ -39,6 +47,15 @@ class AnalysisPayload(BaseModel):
 
 class WorkPackagePayload(BaseModel):
     work_packages: list[SuggestedWorkPackage]
+
+
+class CapabilityPayload(BaseModel):
+    """Schema the model is constrained to produce for a capability assessment."""
+
+    positioning_summary: str
+    strengths: list[CapabilityInsight]
+    gaps: list[CapabilityInsight]
+    suggested_opportunity_areas: list[str]
 
 
 class AnthropicProvider:
@@ -170,4 +187,52 @@ class AnthropicProvider:
             completion_id=response.id if hasattr(response, "id") else None,
             response_time_ms=response_time_ms,
             overall_confidence=round(overall_confidence, 3),
+        )
+
+    async def capability_insights(
+        self, request: CapabilityInsightsRequest
+    ) -> CapabilityInsightsResponse:
+        user_prompt = build_capability_prompt(
+            organization_name=request.organization_name,
+            capability_document=request.capability_document,
+            industries=request.industries,
+            solution_types=request.solution_types,
+            completion_percentage=request.completion_percentage,
+            open_opportunity_titles=request.open_opportunity_titles,
+        )
+
+        try:
+            response = await self._client.beta.messages.parse(
+                model=self._settings.anthropic_model,
+                max_tokens=self._settings.anthropic_max_tokens,
+                system=CAPABILITY_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+                output_format=CapabilityPayload,
+            )
+        except anthropic.APIStatusError as error:
+            raise ProviderError(
+                f"Anthropic API returned {error.status_code} ({error.type})."
+            ) from error
+        except anthropic.APIConnectionError as error:
+            raise ProviderError("Could not reach the Anthropic API.") from error
+
+        if response.stop_reason == "refusal":
+            raise ProviderError("The model declined to assess this capability profile.")
+
+        payload = response.parsed_output
+        if payload is None:
+            raise ProviderError("The model did not return a parseable assessment.")
+
+        try:
+            validated = CapabilityPayload.model_validate(payload)
+        except ValidationError as error:
+            raise ProviderError(f"Model output failed validation: {error}") from error
+
+        return CapabilityInsightsResponse(
+            positioning_summary=validated.positioning_summary,
+            strengths=validated.strengths,
+            gaps=validated.gaps,
+            suggested_opportunity_areas=validated.suggested_opportunity_areas,
+            model=self._settings.anthropic_model,
+            prompt_version=CAPABILITY_PROMPT_VERSION,
         )

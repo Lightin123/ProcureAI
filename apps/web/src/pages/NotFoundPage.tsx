@@ -17,8 +17,10 @@ export function NotFoundPage() {
         <p style={{ margin: "0 0 10px" }}>
           The requested URL does not match any official register entry. Please verify the URL or return to the central directory.
         </p>
-        <Link to="/projects" className="gov-btn gov-btn--primary gov-btn--sm">
-          Return to Procurement Projects Register
+        {/* "/" resolves to whichever portal this role belongs to, so a
+            supplier is not sent to the government register. */}
+        <Link to="/" className="gov-btn gov-btn--primary gov-btn--sm">
+          Return to your dashboard
         </Link>
       </GovernmentAlert>
     </>

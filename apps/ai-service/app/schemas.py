@@ -115,6 +115,31 @@ class WorkPackageDecompositionResponse(BaseModel):
     overall_confidence: float = 0.85
 
 
+# --- Vendor Capability Insight Schemas ---
+
+class CapabilityInsightsRequest(BaseModel):
+    organization_name: str = Field(min_length=1, max_length=300)
+    capability_document: str = Field(min_length=1, max_length=30_000)
+    industries: list[str] = Field(default_factory=list)
+    solution_types: list[str] = Field(default_factory=list)
+    completion_percentage: int = Field(ge=0, le=100)
+    open_opportunity_titles: list[str] = Field(default_factory=list)
+
+
+class CapabilityInsight(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    detail: str = Field(min_length=1, max_length=1_500)
+
+
+class CapabilityInsightsResponse(BaseModel):
+    positioning_summary: str = Field(min_length=1, max_length=3_000)
+    strengths: list[CapabilityInsight]
+    gaps: list[CapabilityInsight]
+    suggested_opportunity_areas: list[str]
+    model: str
+    prompt_version: str
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: Literal["procureai-ai-service"]

@@ -16,8 +16,16 @@ from app.prompts.work_package_decomposition import (
     SYSTEM_PROMPT as WP_SYSTEM_PROMPT,
     build_work_package_prompt,
 )
+from app.prompts.vendor_capability import (
+    PROMPT_VERSION as CAPABILITY_PROMPT_VERSION,
+    SYSTEM_PROMPT as CAPABILITY_SYSTEM_PROMPT,
+    build_user_prompt as build_capability_prompt,
+)
 from app.providers.base import ProviderError
 from app.schemas import (
+    CapabilityInsight,
+    CapabilityInsightsRequest,
+    CapabilityInsightsResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     SuggestedClarification,
@@ -39,6 +47,26 @@ class WorkPackagePayload(BaseModel):
     work_packages: list[SuggestedWorkPackage]
 
 
+class CapabilityPayload(BaseModel):
+    positioning_summary: str
+    strengths: list[CapabilityInsight]
+    gaps: list[CapabilityInsight]
+    suggested_opportunity_areas: list[str]
+
+
+CAPABILITY_SCHEMA_INSTRUCTION = (
+    "Respond with a single JSON object and nothing else - no code fences, no "
+    "commentary. Shape:\n"
+    '{"positioning_summary":..,"strengths":[{"title":..,"detail":..}],'
+    '"gaps":[{"title":..,"detail":..}],"suggested_opportunity_areas":[..]}\n'
+    "All four top-level keys are required; use [] when there is nothing to report. "
+    "title and detail are required non-empty strings."
+)
+
+
+# Kept deliberately compact rather than embedding the full JSON Schema: on a free
+# tier with a low tokens-per-minute cap, a verbose schema dump consumes a large
+# share of the per-request budget for no accuracy gain.
 SCHEMA_INSTRUCTION = (
     "Respond with a single JSON object and nothing else - no code fences, no "
     "commentary. Shape:\n"
@@ -246,4 +274,81 @@ class OpenAICompatibleProvider:
 
         raise ProviderError(
             f"The model did not return valid work packages after {self._settings.ai_max_attempts} attempt(s): {last_error}."
+        )
+
+    async def capability_insights(
+        self, request: CapabilityInsightsRequest
+    ) -> CapabilityInsightsResponse:
+        user_prompt = build_capability_prompt(
+            organization_name=request.organization_name,
+            capability_document=request.capability_document,
+            industries=request.industries,
+            solution_types=request.solution_types,
+            completion_percentage=request.completion_percentage,
+            open_opportunity_titles=request.open_opportunity_titles,
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": f"{CAPABILITY_SYSTEM_PROMPT}\n\n{CAPABILITY_SCHEMA_INSTRUCTION}",
+            },
+            {"role": "user", "content": user_prompt},
+        ]
+
+        last_error: str | None = None
+
+        for attempt in range(1, self._settings.ai_max_attempts + 1):
+            try:
+                completion = await self._client.chat.completions.create(
+                    model=self._settings.ai_model,
+                    max_tokens=self._settings.ai_max_tokens,
+                    messages=messages,  # type: ignore[arg-type]
+                    response_format={"type": "json_object"},
+                )
+            except openai.RateLimitError as error:
+                raise ProviderError(
+                    "The AI provider's rate limit was reached. Wait a moment and try again."
+                ) from error
+            except openai.AuthenticationError as error:
+                raise ProviderError(
+                    "The AI provider rejected the configured API key."
+                ) from error
+            except openai.APIStatusError as error:
+                raise ProviderError(
+                    f"{self._settings.ai_base_url} returned HTTP {error.status_code}."
+                ) from error
+            except openai.APIConnectionError as error:
+                raise ProviderError(
+                    f"Could not reach {self._settings.ai_base_url}."
+                ) from error
+
+            choice = completion.choices[0] if completion.choices else None
+            content = choice.message.content if choice and choice.message else None
+
+            if not content:
+                last_error = "the model returned an empty response"
+                continue
+
+            try:
+                validated = CapabilityPayload.model_validate_json(content)
+            except ValidationError as error:
+                last_error = f"output failed schema validation ({error.error_count()} issue(s))"
+                logger.warning(
+                    "Attempt %s/%s: %s", attempt, self._settings.ai_max_attempts, last_error
+                )
+                continue
+
+            return CapabilityInsightsResponse(
+                positioning_summary=validated.positioning_summary,
+                strengths=validated.strengths,
+                gaps=validated.gaps,
+                suggested_opportunity_areas=validated.suggested_opportunity_areas,
+                model=self._settings.ai_model,
+                prompt_version=CAPABILITY_PROMPT_VERSION,
+            )
+
+        raise ProviderError(
+            f"The model did not return a valid assessment after "
+            f"{self._settings.ai_max_attempts} attempt(s): {last_error}."
         )

@@ -8,6 +8,10 @@ export interface ProcurementProject {
   status: string;
   organizationName: string;
   createdByName: string;
+  publishedAt: string | null;
+  opportunitySummary: string | null;
+  responseDeadline: string | null;
+  interestCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +24,10 @@ interface ProjectRow {
   status: string;
   organization_name: string;
   created_by_name: string;
+  published_at: Date | null;
+  opportunity_summary: string | null;
+  response_deadline: Date | null;
+  interest_count: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -27,6 +35,9 @@ interface ProjectRow {
 const SELECT_PROJECT = `
   SELECT p.id, p.reference_number, p.title, p.problem_description, p.status,
          o.name AS organization_name, u.full_name AS created_by_name,
+         p.published_at, p.opportunity_summary, p.response_deadline,
+         (SELECT COUNT(*)::text FROM vendor_opportunity_engagements e
+          WHERE e.project_id = p.id AND e.interest_state = 'SUBMITTED') AS interest_count,
          p.created_at, p.updated_at
   FROM procurement_projects p
   JOIN organizations o ON o.id = p.organization_id
@@ -42,6 +53,10 @@ function toProject(row: ProjectRow): ProcurementProject {
     status: row.status,
     organizationName: row.organization_name,
     createdByName: row.created_by_name,
+    publishedAt: row.published_at?.toISOString() ?? null,
+    opportunitySummary: row.opportunity_summary,
+    responseDeadline: row.response_deadline?.toISOString().slice(0, 10) ?? null,
+    interestCount: Number.parseInt(row.interest_count, 10),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };

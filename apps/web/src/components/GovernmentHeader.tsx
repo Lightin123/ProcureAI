@@ -1,13 +1,36 @@
-import React from "react";
-import { Link, NavLink } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+
+import { useAuth } from "../auth/AuthContext.js";
+import { NAV_ITEMS, landingPathFor } from "../auth/routeAccess.js";
 import { EmblemIcon } from "./GovernmentIcons.js";
 
-const NAV_ITEMS = [
-  { to: "/projects", label: "Procurement Projects" },
-  { to: "/status", label: "System Status" },
-];
+function initialsOf(fullName: string): string {
+  const parts = fullName.split(/\s+/).filter((part) => part !== "");
+  const letters = parts.map((part) => part.charAt(0)).join("");
+  return letters.slice(0, 2).toUpperCase() || "GO";
+}
 
 export function GovernmentHeader() {
+  const { user, hasPermission, logout } = useAuth();
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+
+  // Filtering here is a usability measure. Every hidden destination is also
+  // refused by the API, which is where access is actually decided. Because the
+  // list is permission-driven, a government official is never shown supplier
+  // navigation and a supplier is never shown the procurement register.
+  const visibleNavItems = NAV_ITEMS.filter((item) => hasPermission(item.permission));
+
+  const homePath = landingPathFor(hasPermission) ?? "/";
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    await logout();
+    // state: null clears the location the route guard captured on the way out,
+    // so the next person to sign in is not sent to this user's last page.
+    await navigate("/login", { replace: true, state: null });
+  }
 
   return (
     <header role="banner">
@@ -35,13 +58,13 @@ export function GovernmentHeader() {
       {/* 2. Main Institutional Identity Bar */}
       <div className="gov-main-header">
         <div className="portal-container gov-main-header__inner">
-          <Link to="/projects" className="gov-main-header__brand" aria-label="ProcureAI Home">
+          <Link to={homePath} className="gov-main-header__brand" aria-label="ProcureAI Home">
             <div className="gov-main-header__emblem" aria-hidden="true">
               <EmblemIcon size={38} />
             </div>
             <div className="gov-main-header__titles">
               <div className="gov-main-header__gov-line">
-                Ministry of Commerce & Industry · Government of India
+                Ministry of Commerce &amp; Industry · Government of India
               </div>
               <div className="gov-main-header__portal-name">
                 ProcureAI
@@ -54,17 +77,27 @@ export function GovernmentHeader() {
           </Link>
 
           {/* Session Area */}
-          <div className="gov-main-header__user-box">
-            <div className="gov-user-avatar" aria-hidden="true">
-              GO
+          {user !== undefined && (
+            <div className="gov-main-header__user-box">
+              <div className="gov-user-avatar" aria-hidden="true">
+                {initialsOf(user.fullName)}
+              </div>
+              <div className="gov-user-meta">
+                <span className="gov-user-meta__name">{user.fullName}</span>
+                <span className="gov-user-meta__role">
+                  {user.roleLabel} · {user.organizationName}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="gov-signout"
+                onClick={() => void handleSignOut()}
+                disabled={signingOut}
+              >
+                {signingOut ? "Signing out…" : "Sign Out"}
+              </button>
             </div>
-            <div className="gov-user-meta">
-              <span className="gov-user-meta__name">Government Officer</span>
-              <span className="gov-user-meta__role">
-                Procurement Division · Active Session
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -72,10 +105,14 @@ export function GovernmentHeader() {
       <nav className="gov-navbar" aria-label="Primary Navigation">
         <div className="portal-container">
           <ul className="gov-navbar__list">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems.map((item) => (
               <li key={item.to} className="gov-navbar__item">
                 <NavLink
                   to={item.to}
+                  // A section with children below it stays highlighted while the
+                  // user is inside them; a landing page without children does
+                  // not steal the highlight from its own siblings.
+                  end={item.matchPrefix === undefined}
                   className={({ isActive }) =>
                     `gov-navbar__link${isActive ? " gov-navbar__link--active" : ""}`
                   }

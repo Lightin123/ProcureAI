@@ -6,9 +6,10 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 3 (AI Requirement Analysis) complete — an
-> official can run AI analysis on a project, review the suggested
-> requirements, and confirm them. See [Current Status](#current-status) below.
+> **Project status:** Milestone 5 (Authentication and RBAC) complete — real
+> users sign in, and every API endpoint is protected by an authenticated
+> session, a permission check, and organization scoping. See
+> [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -109,17 +110,20 @@ for details and rationale.
 
 ## Current Status
 
-**Milestone 3 — AI Requirement Analysis: complete.**
+**Milestones 1–3 and 5 are complete.** Milestone 4 (work packages) is being
+built on a separate branch.
 
-An official creates a procurement project, runs AI analysis on its problem
-description, reviews the suggested requirements and constraints, answers
-clarification questions, and confirms the requirements — moving the project
-`DRAFT → REQUIREMENTS_ANALYSIS → REQUIREMENTS_CONFIRMED`.
+An official signs in, creates a procurement project, runs AI analysis on its
+problem description, reviews the suggested requirements and constraints,
+answers clarification questions, and confirms the requirements — moving the
+project `DRAFT → REQUIREMENTS_ANALYSIS → REQUIREMENTS_CONFIRMED`. Every action
+is recorded against the authenticated user who performed it.
 
-- `apps/web` — React + TypeScript + Vite. Projects register, project detail,
-  create form, requirements review screen, and System Status.
-- `apps/api` — Express + TypeScript. Health, projects, and requirement
-  analysis endpoints, backed by PostgreSQL via `pg`.
+- `apps/web` — React + TypeScript + Vite. Sign-in screen, projects register,
+  project detail, create form, requirements review screen, vendor landing
+  page, and System Status. Routes and navigation are permission-aware.
+- `apps/api` — Express + TypeScript. Authentication, health, projects, and
+  requirement analysis endpoints, backed by PostgreSQL via `pg`.
 - `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
   analysis with three interchangeable providers selected by configuration:
   OpenAI-compatible (currently Groq), Anthropic, and a deterministic stub
@@ -128,11 +132,20 @@ clarification questions, and confirms the requirements — moving the project
 Every AI suggestion is reviewable — nothing enters the confirmed record
 without an explicit decision by the official.
 
-No authentication, RBAC, vendor discovery, work packages, or semantic search
-are implemented yet. See
-[docs/development-roadmap.md](docs/development-roadmap.md) for sequencing and
-[docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for what
-is explicitly out of scope until requested.
+**Authentication and access control.** Sessions are opaque tokens stored in
+PostgreSQL and delivered in an `HttpOnly; SameSite=Strict` cookie; passwords
+are hashed with `scrypt`. Three roles exist — Government Official,
+Administrator (read-only oversight), and Vendor. Every `/api/v1` endpoint
+requires a session and declares the permission it needs, and every query is
+scoped to the user's own organization, so one department cannot reach
+another's projects by changing a URL. The frontend hides controls a role
+cannot use, but the backend is the boundary that actually enforces it. See
+[docs/engineering/security.md](docs/engineering/security.md).
+
+Vendor discovery, work packages, and semantic search are not implemented yet.
+See [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
+and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for
+what is explicitly out of scope until requested.
 
 ---
 
@@ -142,9 +155,12 @@ Requires Node.js (developed against v22), npm, and a PostgreSQL database.
 The development database is hosted rather than installed locally. `apps/web`
 and `apps/api` are independent projects, each installed and run separately.
 
-**1. Configure the database.** Copy `apps/api/.env.example` to
-`apps/api/.env` and set `DATABASE_URL` to your PostgreSQL connection string.
-`.env` is gitignored and must never be committed.
+**1. Configure the database and demo password.** Copy
+`apps/api/.env.example` to `apps/api/.env`, set `DATABASE_URL` to your
+PostgreSQL connection string, and set `SEED_DEMO_PASSWORD` to a value of at
+least 12 characters. `.env` is gitignored and must never be committed. If you
+leave `SEED_DEMO_PASSWORD` unset, the seed script generates a password and
+prints it once.
 
 **2. Start the backend**, applying migrations and seed data first:
 
@@ -152,7 +168,7 @@ and `apps/api` are independent projects, each installed and run separately.
 cd apps/api
 npm install
 npm run migrate      # create tables
-npm run seed         # create the development department and official
+npm run seed         # create demo organizations and user accounts
 npm run dev          # http://localhost:4000
 ```
 
@@ -181,8 +197,10 @@ one of:
   (default `claude-sonnet-5`).
 
 The provider is chosen automatically from whichever key is present, and
-`AI_PROVIDER` overrides it. `GET /health` on either service reports which
-provider is active.
+`AI_PROVIDER` overrides it. The AI service's own `GET /health` reports the
+active provider, as does the portal's System Status screen (and
+`GET /api/v1/system/status`, which requires a signed-in official or
+administrator).
 
 **4. Start the frontend** in a third terminal:
 
@@ -192,27 +210,88 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Open http://localhost:5173 — you land on the Procurement Projects register.
-The System Status page reports backend and database connectivity. In local
-development the frontend reaches the API through the Vite dev-server proxy,
-which forwards `/health` and `/api` to port 4000.
+Open http://localhost:5173 — you are taken to the sign-in screen. Sign in as
+`official@procureai.local` with your `SEED_DEMO_PASSWORD`, and you land on the
+Procurement Projects register. In local development the frontend reaches the
+API through the Vite dev-server proxy, which forwards `/health` and `/api` to
+port 4000.
+
+### Demo accounts
+
+All four share the one password from `SEED_DEMO_PASSWORD`. In development the
+sign-in screen lists them and fills the email field on click; that panel is
+absent from production builds.
+
+| Account | Role | Department | What it shows |
+|---|---|---|---|
+| `official@procureai.local` | Government Official | Infrastructure Development | The full procurement workflow |
+| `admin@procureai.local` | Administrator | Infrastructure Development | Read-only oversight — can view projects but not decide or confirm |
+| `official.health@procureai.local` | Government Official | Health and Family Welfare | A second department; cannot see Infrastructure projects at all |
+| `vendor@procureai.local` | Vendor Representative | Demo Vendor Solutions | A signed-in vendor, with no access to procurement data |
+
+**To reset the passwords**, set `SEED_DEMO_PASSWORD` and run `npm run seed`
+again in `apps/api`. The script is idempotent — it updates the existing
+accounts rather than creating duplicates — and refuses to run when
+`NODE_ENV=production`.
 
 Verify the services directly:
 
 ```bash
-curl http://localhost:4000/health          # reports database and AI service status
-curl http://localhost:4000/api/v1/projects
+curl http://localhost:4000/health          # public liveness probe only
+curl http://localhost:4000/api/v1/projects # 401 without a session cookie
+
+# Sign in, keep the cookie, and use it:
+curl -c cookies.txt -X POST http://localhost:4000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"official@procureai.local","password":"YOUR_SEED_DEMO_PASSWORD"}'
+curl -b cookies.txt http://localhost:4000/api/v1/auth/me
+curl -b cookies.txt http://localhost:4000/api/v1/projects
+curl -b cookies.txt http://localhost:4000/api/v1/system/status  # database + AI service state
+
 curl http://127.0.0.1:8000/health          # AI service, reports active provider
 ```
 
-The API starts even without `DATABASE_URL` — `/health` then reports
-`"database": "unavailable"` and `/api/v1` endpoints return HTTP 503, so the
-portal stays runnable and reports the problem honestly. Likewise, if the AI
-service is down, `/health` reports it and analysis returns HTTP 503 with the
-attempt recorded as a failed run.
+The API starts even without `DATABASE_URL` — `/api/v1/system/status` then
+reports `"database": "unavailable"` and other `/api/v1` endpoints return HTTP
+503, so the portal stays runnable and reports the problem honestly. Likewise,
+if the AI service is down, the status endpoint reports it and analysis returns
+HTTP 503 with the attempt recorded as a failed run. `GET /health` stays a bare
+liveness probe and is the only endpoint that needs no session.
 
 Scripts: `npm run dev`, `npm run build`, `npm run typecheck` in both
 projects; `npm run migrate` and `npm run seed` in `apps/api`.
+
+---
+
+## Milestone 4 Integration (After Merge)
+
+Milestone 4 (work packages) is being built on a separate branch against the
+pre-authentication codebase. When the two branches merge, its routes need
+these changes — nothing else:
+
+1. **Identity.** Replace `await getCurrentOfficial()` with
+   `getCurrentUser(request)` from `src/auth/currentUser.js` at each call site,
+   and drop the `await` — it is now synchronous. The returned object has the
+   same `id` and `organizationId` fields, so nothing downstream changes.
+   `src/repositories/currentOfficial.ts` no longer exists.
+2. **Permissions.** Add `requirePermission("workpackage:read")` or
+   `requirePermission("workpackage:manage")` to each route. Both permissions
+   already exist in `ROLE_PERMISSIONS` and are granted to Government
+   Officials, so nothing needs defining at merge time. If work packages
+   introduce their own stage transitions, use the existing
+   `workflow:transition` rather than adding a permission, unless the semantics
+   genuinely differ.
+3. **Mounting order — the one that matters.** In `src/index.ts`, the
+   work-packages router must be mounted **below** the
+   `app.use("/api/v1", requireAuth)` line. Both branches edit this file, so
+   the merge will conflict here; resolving it by placing the new mount above
+   that line would silently leave work-package routes public.
+4. **Migrations.** Milestone 5 took `004_authentication.sql` and left `003`
+   free, so both apply cleanly in filename order with no schema overlap —
+   Milestone 5 touches only `users`, `organizations`, and a new table.
+5. **Frontend.** Move the work-packages route inside the `RequireAuth` and
+   `RequirePermission` wrappers in `apps/web/src/App.tsx`, and gate its action
+   buttons with `useHasPermission()`.
 
 ---
 

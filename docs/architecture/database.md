@@ -1,10 +1,17 @@
 # Database Design
 
-**Status:** Partially implemented. Milestone 2 created `organizations`,
-`users`, and `procurement_projects`; Milestone 3 added
-`requirement_analysis_runs`, `project_requirements`,
-`clarification_questions`, and `project_stage_history`. Every other data area
-below remains conceptual and undesigned.
+**Status:** Substantially implemented through Milestone 5, in progress on
+Milestone 6. Migration `001_init.sql` (Milestone 2) created `organizations`,
+`users`, and `procurement_projects`; `002_requirement_analysis.sql`
+(Milestone 3) added requirement/clarification tracking;
+`003_work_packages.sql` (Milestone 4) added work-package decomposition and
+review; `004_authentication.sql` (Milestone 5) added real credentials,
+sessions, and roles; `005_vendor_profiles.sql` (Milestone 6) added the
+vendor capability profile, portfolio, document, opportunity-engagement, and
+notification tables. Vendor **matching** (Eligibility Criteria, Candidate
+Evaluations, Evaluation Runs, and the embeddings/pgvector schema below)
+remains conceptual and undesigned — see
+[../ai/vendor-discovery.md](../ai/vendor-discovery.md).
 
 This document maps the data areas implied by the product requirements and
 architecture. The Implemented Schema section below reflects what actually
@@ -19,7 +26,9 @@ them.
 - Data access is `pg` with hand-written SQL and plain `.sql` migrations —
   no ORM (D20).
 - The pgvector extension will be used for embeddings-based semantic search.
-  It is **not enabled yet**; it is not needed until Milestone 6.
+  It is **not enabled yet**. It is now the immediate next priority (see
+  [../development-roadmap.md](../development-roadmap.md) Milestone 6, "Next
+  Phase"), not a later-milestone concern as previously framed here.
 - The Express backend (`apps/api`) is the only component with direct
   database access.
 
@@ -62,27 +71,81 @@ Supporting enums: `analysis_run_status`, `requirement_kind`,
 `requirement_category`, `requirement_source`, `requirement_status`,
 `clarification_status`.
 
+Added in Milestone 4 (`apps/api/migrations/003_work_packages.sql`):
+
+- `work_package_analysis_runs` — one row per decomposition attempt, mirroring
+  `requirement_analysis_runs`'s provenance pattern.
+- `work_packages` — title, description, scope, deliverables, dependencies,
+  complexity, priority, estimated procurement category, AI reasoning,
+  confidence score, and the same accept/reject/edit/manual provenance
+  pattern established for requirements (D28), plus merge/split/soft-delete
+  lineage specific to work packages.
+- `work_package_history` — append-only record of actions taken on a work
+  package (created, edited, merged, split, accepted, rejected, restored),
+  distinct from `project_stage_history`, which tracks the project's own
+  workflow stage.
+
+Added in Milestone 5 (`apps/api/migrations/004_authentication.sql`):
+
+- `organizations.kind` — `GOVERNMENT` or `VENDOR`, distinguishing a
+  government department from a vendor company sharing the same table.
+- `users` gained `password_hash`, `is_active`, `last_login_at`, and a
+  `role` enum (`GOVERNMENT_OFFICIAL` / `ADMIN` / `VENDOR`) replacing the
+  earlier free-text placeholder.
+- `user_sessions` — opaque server-side sessions: hashed token, issue/expiry
+  timestamps (idle and absolute), revocation, and the requesting user agent
+  and IP for audit purposes.
+
+Added in Milestone 6, so far (`apps/api/migrations/005_vendor_profiles.sql`):
+
+- `vendor_profiles` — one row per vendor organization: onboarding status
+  and verification state; organisation details, business classification,
+  capability narrative and structured tags, capacity, experience, and
+  innovation-profile columns collected across the onboarding sections;
+  completion tracking; and a derived `capability_document` (natural-
+  language) plus `capability_keywords` (normalized array), rebuilt on every
+  write — the artifact semantic search will embed once
+  [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md) is
+  implemented.
+- `vendor_offerings`, `vendor_experience`, `vendor_credentials` — repeatable
+  entities under a vendor profile: products/services, past projects,
+  certifications.
+- `vendor_documents` — compliance document metadata and per-document
+  verification state, consistent with the Documents scope map below (file
+  content is stored on disk, not in PostgreSQL).
+- `vendor_opportunity_engagements` — a vendor's saved/interest state against
+  a published procurement project.
+- `vendor_notifications` — in-app notifications written from real
+  onboarding, verification, and document-review events (no background job
+  manufactures them, consistent with D30).
+- `procurement_projects` gained `published_at`, `published_by`,
+  `opportunity_summary`, `response_deadline` — publication to the vendor
+  portal is a distinct, explicit act from confirming requirements
+  internally, not a side effect of workflow status.
+
+Not yet added: any table for eligibility criteria, candidate evaluations,
+evaluation/recommendation runs, or vendor capability embeddings — these
+remain in [Conceptual Data Areas](#conceptual-data-areas-not-yet-designed-in-detail)
+below, now narrowed to specifically the matching/evaluation layer rather
+than vendors in general.
+
 ## Conceptual Data Areas (Not Yet Designed in Detail)
 
 Grouped by concern below. This is a scope map, not a schema — no table or
 column design should be inferred from the grouping or ordering.
 
-### Identity and Organizational Scope
+### Identity and Organizational Scope — Implemented (Milestone 5)
 
-- **Users** — accounts across all roles (see
-  [../product/users-and-roles.md](../product/users-and-roles.md)).
-- **Organizations / Departments** — the government organizational or
-  departmental scope that users and procurement projects belong to.
-  Procurement projects are not free-floating — they exist within an
-  organization/department's scope, and oversight roles (e.g. Government
-  Administrator) act at this scope.
-- **Organization Memberships** — the relationship between a user, an
-  organization/department, their role within it, and the authorization
-  scope that relationship grants. Kept distinct from a global "role" concept
-  since a user's effective permissions may depend on which organization the
-  data belongs to (relevant to the open question about Government
-  Administrator vs. Procurement Administrator in
-  [../product/users-and-roles.md](../product/users-and-roles.md)).
+- **Users** — implemented: real credentials, three roles, session-based
+  identity (see [../product/users-and-roles.md](../product/users-and-roles.md)).
+- **Organizations / Departments** — implemented: `organizations.kind`
+  distinguishes a government department from a vendor company; every
+  procurement project and vendor profile is scoped to one organization.
+- **Organization Memberships** — still conceptual. The implemented model is
+  deliberately **flat, single-organization-per-user** (D49); a user
+  belonging to multiple organizations, or a role that varies by
+  organization, remains undesigned and is not needed by anything currently
+  built.
 
 ### Procurement Core
 
@@ -94,33 +157,38 @@ column design should be inferred from the grouping or ordering.
   (see [AI Suggestion vs. Confirmed State](#ai-suggestions-vs-confirmed-state)).
 - **Clarification Questions / Answers** — generated questions and official
   responses tied to a project.
-- **Work Packages / Solution Components** — divisions of a project's
-  structured requirements into procurable units, per
+- **Work Packages / Solution Components** — **implemented** (Milestone 4,
+  `work_packages`) — divisions of a project's structured requirements into
+  procurable units, per
   [../product/requirements.md](../product/requirements.md) FR3.
 
-### Vendors
+### Vendors — Partially Implemented (Milestone 6)
 
-- **Vendor Organizations** — the startup/vendor entity actually being
-  discovered and evaluated: capability data, sector/size/location metadata,
-  and the embeddings used for semantic search. This is the organization's
-  profile, not an individual user account.
-- **Vendor Memberships / Representatives** — individual user accounts that
-  act on behalf of a Vendor Organization (e.g. submitting RFI responses).
-  Kept distinct from Vendor Organizations for the same reason Users are kept
-  distinct from Organizations above: a vendor's capability profile is not
-  the same concept as the people authorized to act for it.
+- **Vendor Organizations** — implemented as `vendor_profiles`: capability
+  data, structured classification, capacity, experience, and the derived
+  capability document/keywords described above. The **embeddings** used for
+  semantic search are not yet part of this table — see
+  [Embeddings / Vector Search](#embeddings--vector-search-planned) below.
+- **Vendor Memberships / Representatives** — still conceptual, and
+  simplified today: one vendor organization currently has exactly one user
+  account (the account created at registration), not a set of
+  representatives. A vendor organization needing multiple staff accounts
+  with different permissions is not yet supported.
 
 ### Documents
 
-- **Submissions / Responses** — a vendor organization's response to a work
-  package's RFI/proposal request; links a Vendor Organization, a Work
-  Package, and the set of Documents provided.
-- **Documents** — first-class metadata records for uploaded files:
-  filename, type, owning entity (e.g. a Submission, a Vendor Organization
-  profile), storage reference (see
-  [architecture.md](architecture.md#file--object-storage-conceptual)), and
-  processing status. Documents conceptually store metadata and a storage
-  reference — not large file content — in PostgreSQL.
+- **Submissions / Responses** — still conceptual (Milestone 8). A vendor
+  organization's response to a work package's RFI/proposal request; links a
+  Vendor Organization, a Work Package, and the set of Documents provided.
+- **Documents** — **partially implemented.** `vendor_documents` (Milestone
+  6) already establishes the pattern this scope map describes for
+  compliance documents specifically: metadata in PostgreSQL (filename,
+  type, owning vendor profile, storage reference, per-document
+  verification state), file content on local disk under the API's upload
+  directory rather than in the database — matching
+  [architecture.md](architecture.md#file--object-storage-conceptual).
+  Extending this pattern to RFI/proposal submissions (Milestone 8) and to
+  document-processing output (below) is not yet designed.
 - **Document Processing Results** — structured output produced by document
   intelligence (see
   [../ai/document-intelligence.md](../ai/document-intelligence.md)) against
@@ -196,19 +264,26 @@ single global pattern decided here.
 
 ## Explicitly Not Yet Decided
 
-- Whether an ORM (e.g. Prisma) or raw SQL/query builder will be used.
-- Migration tooling and strategy.
-- Detailed table/column schema for any of the conceptual areas above.
-- Indexing strategy beyond the general intent to use pgvector.
-- The exact organization/department scoping model (e.g. strict hierarchy vs.
-  flat, single-org-per-user vs. multi-org membership).
-- How Organization Memberships and the global role model in
-  [../product/users-and-roles.md](../product/users-and-roles.md) relate —
-  whether roles are always org-scoped or some are global.
+- Detailed table/column schema for eligibility criteria, candidate
+  evaluations, and evaluation/recommendation runs (Milestone 6 next phase
+  and Milestone 9) — see
+  [../ai/vendor-discovery.md](../ai/vendor-discovery.md) and
+  [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
+- Embedding storage schema: dimensionality, indexing strategy (IVFFlat vs.
+  HNSW), and whether embeddings live on `vendor_profiles` directly or in a
+  separate table — see
+  [Embeddings / Vector Search](#embeddings--vector-search-planned).
+- Whether an unverified vendor's embeddings/matching data are generated and
+  stored before verification, or only after.
 - The specific mechanism used to satisfy traceability in
   [AI Suggestions vs. Confirmed State](#ai-suggestions-vs-confirmed-state)
-  per data area.
+  for vendor matching and evaluation specifically — the requirements (D28)
+  and work-package patterns exist as precedent but have not been confirmed
+  as the right fit for matching, which produces a *ranking over existing
+  data* rather than *new suggested data* in the same sense.
 - Retention and comparison UX for multiple Evaluation / Recommendation Runs.
+- Schema for vendor submissions/responses (Milestone 8) and Vendor
+  Memberships / Representatives (multiple staff per vendor organization).
 
 ## Related Documents
 

@@ -1,21 +1,37 @@
 # AI System Overview
 
-**Status:** Partially implemented. Requirement extraction, constraint
-identification, missing-information detection, and clarification-question
-generation are implemented as of Milestone 3. Every other capability below
-remains planned.
+**Status:** Partially implemented. Requirement extraction (Milestone 3),
+work-package decomposition (Milestone 4), and vendor capability-insight
+generation (Milestone 6) are implemented, each behind the same three-
+provider selection described below. Semantic vendor matching, document
+information extraction, proposal analysis, and candidate comparison remain
+planned — see [vendor-discovery.md](vendor-discovery.md),
+[rag-and-semantic-search.md](rag-and-semantic-search.md), and
+[evaluation-and-ranking.md](evaluation-and-ranking.md) for what exists
+versus what is next.
 
 The service runs on FastAPI at `127.0.0.1:8000` and is called only by the
 Express backend.
 
-## Implemented Capability (Milestone 3)
+## Implemented Capabilities
 
-`POST /internal/v1/requirement-analysis` takes a project title, problem
-description, already-recorded requirements, and answered clarifications, and
-returns validated `requirements` and `clarification_questions`, each with a
-rationale.
+`POST /internal/v1/requirement-analysis` (Milestone 3) takes a project
+title, problem description, already-recorded requirements, and answered
+clarifications, and returns validated `requirements` and
+`clarification_questions`, each with a rationale.
 
-Two providers implement the same interface:
+`POST /internal/v1/work-package-decomposition` (Milestone 4) takes
+confirmed requirements and returns suggested work packages — title,
+description, scope, deliverables, dependencies, complexity, priority, and
+an AI reasoning field — following the same provenance pattern as
+requirement analysis (D55).
+
+`POST /internal/v1/vendor-capability-insights` (Milestone 6) takes a
+vendor's capability document and returns a positioning summary, strengths,
+gaps, and suggested opportunity areas — advisory only; nothing in vendor
+matching, verification, or eligibility reads this output back.
+
+All three endpoints are implemented behind the same three providers:
 
 - **`anthropic`** — calls Claude through the official `anthropic` Python SDK
   using structured outputs, so the response is schema-constrained rather than
@@ -67,19 +83,21 @@ It is not a generic assistant layered on top of the product — see
 [../product/product.md](../product/product.md) for the "What ProcureAI Is
 Not" section.
 
-Planned AI capabilities:
+AI capabilities, implemented vs. planned:
 
-- Requirement extraction
-- Requirement classification
-- Missing-information detection
-- Clarification-question generation
-- Work-package generation
-- Semantic vendor discovery (embeddings via pgvector)
-- Document information extraction
-- Proposal analysis
-- Technical capability analysis
-- Candidate comparison
-- Recommendation explanation
+- Requirement extraction — implemented (Milestone 3)
+- Requirement classification — implemented (Milestone 3)
+- Missing-information detection — implemented (Milestone 3)
+- Clarification-question generation — implemented (Milestone 3)
+- Work-package generation — implemented (Milestone 4)
+- Vendor capability positioning/gap insight — implemented (Milestone 6),
+  advisory only
+- Semantic vendor discovery (embeddings via pgvector) — **planned, current
+  priority** — see [rag-and-semantic-search.md](rag-and-semantic-search.md)
+- Document information extraction — planned (Milestone 8)
+- Proposal analysis — planned (Milestone 9)
+- Technical capability analysis, candidate comparison, recommendation
+  explanation — planned (Milestone 6 next phase and Milestone 9)
 
 Each capability corresponds to a specific step in
 [../design/procurement-workflow.md](../design/procurement-workflow.md), not

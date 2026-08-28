@@ -42,22 +42,53 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1, 2, and 3 are complete. Full status:
+Milestones 1 through 5 are complete. Milestone 6 (vendor ecosystem) is in
+progress: vendor registration, onboarding, capability profiles,
+verification, the vendor portal, and project-level deterministic matching
+are implemented. Work-package-level hybrid (lexical + semantic) matching is
+the current development priority and is not yet built. Full status:
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
 [docs/development-roadmap.md](docs/development-roadmap.md).
 
 Implemented: React portal + Express API + PostgreSQL + FastAPI AI service.
-Officials can create projects, run AI requirement analysis, review and edit
-suggestions, answer clarifications, and confirm requirements. Next up is
-Milestone 4 (work packages) — not started.
+Officials sign in, create projects, run AI requirement analysis, review and
+edit suggestions, answer clarifications, confirm requirements, generate and
+review AI work packages, and confirm them. Vendors self-register, complete
+a progressive onboarding, get verified by an administrator, and discover
+published opportunities matched against their profile.
+
+**Authentication and RBAC are implemented (Milestone 5).** When touching the
+API, the rules are:
+
+- Identity comes from the session, via `getCurrentUser(request)` in
+  `src/auth/currentUser.ts`. Never from a header, body, or query parameter.
+  `repositories/currentOfficial.ts` and D21's seeded identity are gone.
+- `requireAuth` is mounted on the `/api/v1` prefix in `src/index.ts`, so any
+  new route under it is authenticated automatically. **Mount new routers below
+  that line.**
+- Every route declares `requirePermission("...")`. Do not write
+  `if (role === "ADMIN")` in a route — add the permission to
+  `ROLE_PERMISSIONS` in `src/auth/permissions.ts` instead.
+- Organization scoping stays in SQL, taking the organization from
+  `request.user`. Cross-organization access returns 404, not 403.
+- Never return a password hash, and never add a `SELECT *`.
+
+See [docs/engineering/security.md](docs/engineering/security.md) and
+[docs/product/users-and-roles.md](docs/product/users-and-roles.md).
 
 **Do not implement** until explicitly requested:
-- Authentication and RBAC — Milestone 5. The acting official is a seeded
-  server-side constant (D21) until then
-- Vendor functionality, semantic search, pgvector — Milestone 6
-- RFI/proposal collection, document intelligence, evaluation — Milestone 7
+- Work-package-level vendor matching, eligibility filtering, pgvector,
+  embeddings, hybrid semantic retrieval — Milestone 6, current priority.
+  See [docs/ai/vendor-discovery.md](docs/ai/vendor-discovery.md).
+- Vendor shortlisting and invitation — Milestone 7
+- RFI/proposal collection, document intelligence, response evaluation —
+  Milestones 8–9
+- Vendor gap analysis, procurement analytics — Milestone 10
+- Advanced semantic optimization (learned ranking, query expansion,
+  reranking) — Milestone 11
 - Workflow transitions beyond `WORK_PACKAGES_CONFIRMED`
 - Background job infrastructure (analysis is synchronous — see D30)
+- Administrator user-management UI or password reset (U30)
 - Docker, CI/CD, or deployment configuration
 
 ## Development Workflow

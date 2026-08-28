@@ -44,11 +44,31 @@ implemented vs. planned.
   single solution or provider is appropriate.
 
 ### FR4 — Vendor / Startup Discovery
+
+**Status: partially implemented.** A vendor onboarding, verification and
+project-level matching precursor exists (see
+[users-and-roles.md](users-and-roles.md) and
+[../ai/vendor-discovery.md](../ai/vendor-discovery.md)), but FR4.1 as
+specified below — semantic, work-package-level discovery — is the current
+development priority and not yet built. What exists today is deterministic
+lexical matching at whole-project granularity, described in
+[../ai/vendor-discovery.md](../ai/vendor-discovery.md) as a distinct,
+narrower capability from FR4.
+
 - FR4.1: The system discovers candidate vendors using semantic search over
-  vendor capability data.
+  vendor capability data, **scoped to a specific confirmed work package**.
+  Not yet implemented — see
+  [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md).
 - FR4.2: The system supports structured filtering (e.g. sector, size,
-  location, certifications) alongside semantic search.
+  location, certifications) alongside semantic search, applied as a
+  deterministic eligibility gate prior to ranking (not folded into the
+  match score) — see
+  [../ai/vendor-discovery.md](../ai/vendor-discovery.md#eligibility-filtering-planned).
+  Not yet implemented as a distinct gate; a version of several of these
+  signals currently contributes to the project-level match score instead.
 - FR4.3: The official can review and adjust the candidate vendor list.
+  Not yet implemented — depends on FR4.1/FR4.2 producing a package-level
+  candidate list to review.
 
 ### FR5 — RFI / Proposal Collection
 - FR5.1: The system supports collecting RFI responses or proposal documents
@@ -164,33 +184,45 @@ later stage requires it.
 
 ## Current Milestone Scope
 
-Milestones 1 through 3 are implemented. Against the functional requirements
-above:
+Milestones 1 through 5 are implemented, and Milestone 6 is in progress —
+see [../development-roadmap.md](../development-roadmap.md) for full detail
+on what "in progress" covers. Against the functional requirements above:
 
 | Requirement | Status |
 |---|---|
 | FR1.1 — official can create a procurement project | Implemented |
 | FR1.2 — free-form natural-language problem description | Implemented |
-| FR1.3 — project tracks its current workflow stage | Implemented for the three requirement states, with every transition recorded in `project_stage_history` |
+| FR1.3 — project tracks its current workflow stage | Implemented across the full workflow, with every transition recorded in `project_stage_history` |
 | FR2.1 — extract structured requirements | Implemented |
 | FR2.2 — identify constraints | Implemented (`CONSTRAINT` kind with BUDGET / TIMELINE / COMPLIANCE categories) |
 | FR2.3 — detect missing information | Implemented |
 | FR2.4 — generate clarification questions | Implemented |
 | FR2.5 — official answers clarifications, fed back into analysis | Implemented |
 | FR2.6 — edit / approve / reject AI-extracted requirements | Implemented, with rejection requiring a reason |
-| FR3–FR9 | Not implemented |
-| FR10 — access control | Not implemented. Projects are scoped by organization in every query, but there is no authentication or RBAC yet |
-| FR11 — auditability | Not implemented |
+| FR3.1–FR3.3 — work package decomposition, review, single-package path | Implemented |
+| FR4.1 — semantic, work-package-level vendor discovery | Not implemented. A narrower, project-level, lexical-only precursor exists — see [../ai/vendor-discovery.md](../ai/vendor-discovery.md) |
+| FR4.2 — structured filtering as a deterministic eligibility gate | Not implemented as a distinct gate; related signals currently contribute to the project-level match score instead |
+| FR4.3 — official reviews/adjusts the candidate vendor list | Not implemented (depends on FR4.1/FR4.2) |
+| FR5 — RFI / proposal collection | Not implemented |
+| FR6 — document intelligence | Not implemented |
+| FR7 — evaluation | Not implemented (this is response evaluation; see Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md), distinct from the vendor-ranking work in FR4) |
+| FR8 — ranking and recommendation | Not implemented at work-package level. A project-level, explainable ranking exists as part of the FR4 precursor |
+| FR9 — human review and decision | Implemented for every AI-generated suggestion built so far (requirements, work packages); FR9.2 (recording a final procurement decision) awaits Milestone 9 |
+| FR10 — access control | Implemented (Milestone 5): three roles, permission-based authorization, organization scoping enforced on every query |
+| FR11.1 — auditability of key actions | Implemented for requirement and work-package decisions, stage transitions, and vendor verification decisions. A general-purpose audit log across all data areas does not exist |
 
 Against the non-functional requirements: **NFR1** is met for requirement
-analysis — every suggestion carries a rationale. **NFR2** is met: AI output is
+analysis, work package generation, and vendor matching — every suggestion
+and every match score carries a rationale. **NFR2** is met: AI output is
 schema-validated by Pydantic and re-validated by zod before persistence.
-**NFR3** is partially met (input validated at the boundary; authentication and
-authorization are not built). **NFR4** is partially met — stage transitions and
-review decisions are recorded, though a general audit log does not exist.
-**NFR8** is met for requirements via the provenance model. NFR6 and NFR7 are
-being observed. The remainder depend on
-features not yet implemented.
+**NFR3** is met: authentication and role-based authorization protect every
+non-public endpoint (Milestone 5), and input is validated at the boundary.
+**NFR4** is substantially met — stage transitions, review decisions, and
+vendor verification decisions are recorded, though a general-purpose audit
+log across every data area does not exist. **NFR8** is met for requirements
+and work packages via the provenance model. NFR6 and NFR7 are being
+observed. NFR5 and NFR9 remain unaddressed as stated requirements rather
+than implemented features.
 
 See [hackathon-scope.md](hackathon-scope.md) for the distinction between
 hackathon-demo scope and long-term product scope, and

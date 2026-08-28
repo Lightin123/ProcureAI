@@ -97,8 +97,10 @@ Express backend.
   projects, requirements, work packages, vendors, evaluations, background
   job/status records, and **document metadata** (filename, type, owning
   entity, storage reference) — not the document content itself.
-- pgvector extension used for semantic search (vendor discovery, requirement
-  matching) once implemented.
+- pgvector extension used for semantic search (work-package-to-vendor
+  matching) once implemented — the immediate next development priority,
+  not a distant one. See [../ai/vendor-discovery.md](../ai/vendor-discovery.md)
+  and [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md).
 - Owned exclusively by the Express backend.
 
 ### File / Object Storage (Conceptual)
@@ -222,21 +224,43 @@ now. See [decisions.md](decisions.md).
 
 ## Current Implementation Status
 
-Milestones 1 and 2 are implemented:
+Milestones 1 through 5 are implemented, and Milestone 6 is in progress —
+see [../development-roadmap.md](../development-roadmap.md) for full
+milestone detail.
 
-- `apps/web` (React + TypeScript + Vite) calls `apps/api` over REST.
-- `apps/api` (Express + TypeScript) serves `GET /health` and the
-  `/api/v1/projects` endpoints, and is the only component that talks to
-  PostgreSQL.
-- PostgreSQL holds organizations, users, and procurement projects. The
-  development database is hosted rather than local (D19). The pgvector
-  extension is **not** enabled yet — it is not needed until semantic search
-  in Milestone 6.
+- `apps/web` (React + TypeScript + Vite) calls `apps/api` over REST, with
+  session-based authentication and role-aware routing/navigation.
+- `apps/api` (Express + TypeScript) is the only component with direct
+  PostgreSQL access, and the only caller of `apps/ai-service`. It serves
+  procurement projects, requirement analysis, work packages, authentication
+  and session management, and the vendor registration/onboarding/portal
+  surface.
+- `apps/ai-service` (FastAPI + Pydantic) is implemented: requirement
+  analysis, work-package decomposition, and vendor capability-insight
+  generation, each behind an Anthropic provider, an OpenAI-compatible
+  provider (Groq et al.), and a deterministic stub provider that runs
+  without any API key.
+- PostgreSQL holds organizations (government and vendor), users with real
+  credentials, sessions, procurement projects, requirements, work packages,
+  and vendor capability profiles. The development database is hosted
+  rather than local (D19). The **pgvector extension is not enabled yet** —
+  unlike earlier framings of this document, it is now the **immediate next
+  priority**, not a later-milestone concern; see
+  [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md).
+- File/object storage is partially implemented ahead of the general
+  conceptual design above: vendor compliance documents are stored on local
+  disk with metadata in PostgreSQL (`vendor_documents`), which is the
+  pattern the general design will extend to other document types.
+- Background job processing remains conceptual and unimplemented; analysis,
+  decomposition, and matching all run synchronously (D30).
 
-Not yet implemented: `apps/ai-service` (still an empty directory), file
-storage, and background job processing. Those are described above as target
-architecture only. Authentication and RBAC also do not exist yet — the
-backend resolves a single seeded official server-side (D21).
+Vendor-to-opportunity matching exists today at **project level**, using
+**deterministic lexical scoring only** — no embeddings, no work-package
+granularity, no distinct eligibility gate. This is a genuine but partial
+step toward the target architecture; see
+[../ai/vendor-discovery.md](../ai/vendor-discovery.md) for exactly what
+exists versus what the next phase (hybrid, work-package-level matching)
+requires.
 
 ## Related Documents
 

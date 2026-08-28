@@ -1,14 +1,20 @@
 # Users and Roles
 
-**Status:** Planned design. Role-based access control (RBAC) is a stated
-principle; no authentication or authorization has been implemented yet (see
-[../engineering/security.md](../engineering/security.md)).
+**Status:** Implemented as of Milestone 5. Three roles exist, authenticate,
+and are enforced by the Express backend — see
+[../engineering/security.md](../engineering/security.md) for the
+authentication and authorization architecture.
 
-## Primary User
+## Implemented Roles
 
-### Government Procurement / Department Official
+Milestone 5 implements **three roles, one per user**, stored as the
+`user_role` PostgreSQL enum (D46). The role model below replaces the earlier
+five-role sketch; what changed and why is recorded under
+[Roles Not Implemented](#roles-not-implemented).
 
-The main user of the platform. Owns procurement projects end to end.
+### Government Procurement / Department Official — `GOVERNMENT_OFFICIAL`
+
+The primary user of the platform. Owns procurement projects end to end.
 
 Responsibilities:
 - Create procurement projects and describe problems/requirements.
@@ -19,89 +25,150 @@ Responsibilities:
 - Review evaluations, rankings, and explanations.
 - Make and record the final procurement decision.
 
-Permissions (planned):
-- Full read/write on their own procurement projects.
-- Cannot bypass required human-review checkpoints.
+Permissions: full read/write on procurement projects **within their own
+organization**, including running AI analysis and performing workflow
+transitions. Cannot bypass required human-review checkpoints, and cannot see
+another department's projects.
 
-## Other Roles (Planned)
+### Administrator — `ADMIN`
 
-### Government Administrator
+Departmental oversight. Merges what were previously described as "Government
+Administrator" and "Procurement Administrator" (D46).
 
-Oversees officials and projects at a department/organizational level.
-
-Responsibilities (planned):
+Responsibilities:
 - View procurement projects across officials in their department.
-- Configure department-level settings (future, unresolved scope).
-- Oversight/audit of procurement decisions.
+- Oversight and audit of procurement activity.
+- User administration within their department (no endpoint yet — see U30).
 
-Permissions (planned):
-- Read access across department projects.
-- Administrative actions scoped to their department.
+Permissions: **read-only across their organization.** An administrator is
+deliberately *not* able to create projects, run analysis, decide on
+requirements, answer clarifications, or transition a workflow stage (D48).
 
-### Procurement Administrator
+> **Why administrators cannot act on a project.** A procurement decision must
+> be attributable to the government official who made it (FR11.1, Workflow
+> Principle 6). An oversight role able to quietly confirm another official's
+> requirements would defeat both the audit trail and the accountability model.
+> The accepted cost is that an administrator cannot unblock a project on an
+> absent official's behalf.
 
-A more specialized administrative role focused on procurement process
-governance (e.g. compliance rules, evaluation criteria templates).
+### Vendor Representative — `VENDOR`
 
-Responsibilities (planned):
-- Maintain evaluation criteria/weighting templates.
-- Maintain compliance checklists used during evaluation.
+Represents a startup, manufacturer, service provider, or other solution
+provider that can be discovered and matched by the platform — not limited
+to technology companies. Vendor accounts exist, authenticate, self-register
+publicly, and onboard a capability profile (Milestone 6, implemented).
+Submitting a structured RFI response or proposal (rather than expressing
+interest in a published opportunity) is not yet implemented — see
+[../development-roadmap.md](../development-roadmap.md) Milestone 8.
 
-Permissions (planned):
-- Manage procurement configuration entities.
-- Read access to procurement projects for governance purposes.
+Responsibilities (implemented):
+- Register the organization and maintain its capability profile through a
+  progressive, industry-adaptive onboarding flow.
+- Add products/services, past experience, and credentials; upload
+  compliance documents.
+- Discover published procurement opportunities matched against the
+  profile, save opportunities, and register interest.
 
-**Open question:** whether "Government Administrator" and "Procurement
-Administrator" are genuinely distinct roles or should be merged into one
-administrative role. Not yet decided — see
-[../architecture/decisions.md](../architecture/decisions.md).
+Responsibilities (planned, Milestones 7–8):
+- Receive invitations to specific work packages.
+- Submit RFI responses / proposals / quotations, distinct from the
+  unstructured "register interest" signal already implemented.
 
-### Startup / Vendor Representative
+Permissions: `vendor:profile:read`, `vendor:profile:manage`,
+`vendor:opportunity:read`, `vendor:opportunity:engage`. A vendor holds
+**no** project, requirement, workflow, or system-diagnostics permission —
+access to internal government data is not restricted by a check that could
+be bypassed, because there is no grant to bypass. Signing in as a vendor
+leads to the vendor portal; every procurement endpoint and the system-status
+endpoint return 403.
 
-Represents a startup or solution provider that can be discovered and
-evaluated by the platform.
+## Implemented Permission Matrix
 
-Responsibilities (planned):
-- Maintain their organization's profile/capability data.
-- Submit RFI responses / proposals for procurement projects they are invited
-  to or apply to.
+Authorization is permission-based (D47): routes declare a permission, and
+`ROLE_PERMISSIONS` in `apps/api/src/auth/permissions.ts` is the single
+authoritative mapping. This table mirrors that file.
 
-Permissions (planned):
-- Read/write access limited to their own vendor profile and their own
-  submissions.
-- No access to other vendors' data or to internal evaluation results.
+| Permission | Official | Admin | Vendor |
+|---|---|---|---|
+| `project:create` | Yes | — | — |
+| `project:read` | Yes | Yes | — |
+| `project:update` | Yes | — | — |
+| `requirements:read` | Yes | Yes | — |
+| `requirements:analyze` | Yes | — | — |
+| `requirements:decide` | Yes | — | — |
+| `clarification:answer` | Yes | — | — |
+| `workflow:transition` | Yes | — | — |
+| `workpackage:read` | Yes | Yes | — |
+| `workpackage:manage` | Yes | — | — |
+| `opportunity:publish` | Yes | — | — |
+| `organization:read` | Yes | Yes | — |
+| `system:status:read` | Yes | Yes | — |
+| `user:read` | — | Yes | — |
+| `user:manage` | — | Yes | — |
+| `audit:read` | — | Yes | — |
+| `vendor:registry:read` | — | Yes | — |
+| `vendor:verification:manage` | — | Yes | — |
+| `vendor:profile:read` | — | — | Yes |
+| `vendor:profile:manage` | — | — | Yes |
+| `vendor:opportunity:read` | — | — | Yes |
+| `vendor:opportunity:engage` | — | — | Yes |
 
-**Open question:** whether vendor self-service (profile management, RFI
-submission) is in scope for the hackathon build or a future extension. See
-[hackathon-scope.md](hackathon-scope.md).
+Every "Yes" is additionally scoped to the user's own organization — see
+[Organization Scope](#organization-scope) — **except** `vendor:registry:read`
+and `vendor:verification:manage`, which are deliberately platform-wide: an
+administrator verifies suppliers across every vendor organization, not only
+their own department's (D60). `system:status:read` is withheld from vendors,
+who are external parties (D54). `opportunity:publish` governs an official
+exposing a confirmed project to the vendor portal (D57) — a separate act
+from `workflow:transition`. `user:manage` and `audit:read` are granted but
+have no endpoints yet (U30, U31).
 
-### System Administrator
+## Organization Scope
 
-Technical administrator of the platform itself.
+Each user belongs to exactly one organization via `users.organization_id`
+(D49). A role grants a capability; the organization decides which records that
+capability applies to. Effective authority is therefore *role x organization*.
 
-Responsibilities (planned):
-- User and role management.
-- System configuration and monitoring.
-- Access to audit logs.
+`organizations.kind` distinguishes a `GOVERNMENT` department from a `VENDOR`
+company, so vendor users participate in the same foreign key without a
+government project ever being scoped to a vendor organization.
 
-Permissions (planned):
-- Full administrative access, separate from procurement decision-making
-  authority.
+Access to another organization's data returns **404, not 403** — a 403 would
+confirm that a resource with that identifier exists elsewhere.
 
-## RBAC Summary (Planned, Not Implemented)
+## Roles Not Implemented
 
-| Role | Manage Own Projects | View Other Projects | Manage Evaluation Config | Manage Vendor Profile | System Admin |
-|---|---|---|---|---|---|
-| Government Official | Yes | No | No | No | No |
-| Government Administrator | Yes (department) | Yes (department) | No | No | No |
-| Procurement Administrator | No | Read | Yes | No | No |
-| Vendor Representative | No | No | No | Yes (own) | No |
-| System Administrator | No | No | No | No | Yes |
+### Procurement Administrator — merged into `ADMIN`
 
-This table describes intended design, not implemented behavior.
+The distinction between "Government Administrator" and "Procurement
+Administrator" was the long-standing open question U4. It is resolved by
+merging them (D46): the only thing that separated them was management of
+evaluation-criteria templates and compliance checklists, and neither exists
+before Milestone 7. Two roles indistinguishable in every implemented surface
+are one role with two names. If Milestone 7 makes them genuinely divergent,
+splitting is a data migration on a single column.
+
+### System Administrator — not implemented
+
+A platform-operations role whose entire surface — user management UI, system
+configuration, monitoring, audit log access — does not exist. Creating an
+empty role would be scaffolding. It is recorded here as deliberately deferred
+rather than dropped.
+
+## Demo Accounts
+
+`npm run seed` provisions, for development and demonstration only: three
+government accounts across two departments (two officials, one
+administrator), and a set of vendor accounts spanning multiple industries
+— manufacturing, agriculture, construction, healthcare, skilling,
+sustainability — at varying onboarding-completion and verification states,
+alongside published procurement opportunities for them to match against.
+Credential handling and the reset procedure are covered in
+[../engineering/security.md](../engineering/security.md).
 
 ## Related Documents
 
 - [requirements.md](requirements.md)
 - [../engineering/security.md](../engineering/security.md)
 - [../architecture/decisions.md](../architecture/decisions.md)
+- [../architecture/database.md](../architecture/database.md)

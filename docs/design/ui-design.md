@@ -98,12 +98,65 @@ government portal does:
   [../architecture/database.md](../architecture/database.md)).
 - A right-aligned **session area**: signed-in official's name and role,
   and a sign-out action. No decorative avatar imagery — a plain
-  name/role label is sufficient.
+  name/role label is sufficient. **Implemented in Milestone 5**: the header
+  shows the authenticated user's name, role label, and organization, with a
+  Sign Out control.
 - The header is a fixed, thin institutional strip — not a large branded
   hero band. It should read as "official system," not "product marketing."
 - A persistent, unobtrusive area for **system-wide notices** (e.g.
   scheduled maintenance, policy updates) may render directly beneath the
   header when active — see [Notices, Alerts, and Announcements](#notices-alerts-and-announcements).
+
+## Sign-In Screen
+
+The sign-in screen is the only unauthenticated screen, and it must read as an
+official portal rather than a generic product login.
+
+- It sits **outside** the portal shell — no primary navigation, no breadcrumb,
+  no section navigation, since none of those are meaningful before sign-in.
+- It keeps the national identity strip (tricolour, "भारत सरकार | Government of
+  India") and the institutional emblem, so legitimacy is established before
+  credentials are entered.
+- A two-column layout: portal identity and a short statement of purpose on the
+  left, the sign-in panel on the right, collapsing to a single column below
+  900px.
+- It uses the existing design system unchanged — `gov-card` conventions,
+  `gov-form-control`, `gov-btn--primary`, `GovernmentAlert` for errors, and
+  the existing colour tokens. No new palette, no new typeface.
+- A restricted-system notice is shown, as a real government portal does.
+- Errors appear as a `GovernmentAlert`, never as an inline browser validation
+  bubble. The screen gives **no password-policy hints**, which would be an
+  information leak.
+- In development only (`import.meta.env.DEV`), a panel lists the demo accounts
+  and fills the email field on click. It is absent from production builds.
+
+## Authentication States
+
+- **Verifying** — while the session is being checked, a full-viewport panel
+  with the tricolour strip, emblem, and "Verifying session" is shown. No route
+  renders during this state, so neither the login screen nor protected content
+  flashes.
+- **Not permitted** — a user who reaches a section their role does not cover
+  sees a dedicated page stating what access they hold and who to contact. It
+  renders in place, keeping the URL, rather than silently redirecting, which
+  would read as a bug.
+- **Session ended** — an expired or revoked session returns the user to
+  sign-in with an explanation, distinct from simply not being signed in.
+
+**Where sign-in sends you.** When a guard interrupts someone mid-navigation it
+remembers where they were heading, and sign-in returns them there. That
+remembered location belongs to whoever was interrupted, though, which is not
+necessarily whoever signs in next — after a sign-out and a switch of account it
+can point at a section the new user may not open. The redirect therefore
+honours it only if the signed-in user can actually reach it, and otherwise
+starts them at their own landing section. Route permissions and the
+landing-section rule live in one place (`apps/web/src/auth/routeAccess.ts`) so
+the guards and the redirect cannot disagree.
+
+Navigation and action controls are filtered by permission, so a user is not
+shown doors they cannot open. This is a usability measure only — the backend
+refuses the same requests regardless of what the browser renders (see
+[../engineering/security.md](../engineering/security.md)).
 
 ## Navigation Patterns
 
@@ -112,6 +165,9 @@ government portal does:
   Procurement Projects, Vendors, Evaluations, Reports/Audit,
   Administration (role-dependent visibility per
   [../product/users-and-roles.md](../product/users-and-roles.md)).
+  **Implemented in Milestone 5**: each navigation entry declares the
+  permission it needs and is filtered against the authenticated user's
+  permissions — a vendor sees no "Procurement Projects" entry at all.
 - **Section navigation** (a secondary left sidebar) is used within a
   complex area that has multiple sub-views — for example, within a single
   procurement project: Overview, Requirements, Work Packages, Vendor

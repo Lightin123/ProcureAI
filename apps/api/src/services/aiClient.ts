@@ -207,3 +207,91 @@ export async function requestWorkPackageDecomposition(
 
   return parsed.data;
 }
+
+const capabilityInsightsSchema = z.object({
+  positioning_summary: z.string().trim().min(1).max(3000),
+  strengths: z.array(
+    z.object({
+      title: z.string().trim().min(1).max(200),
+      detail: z.string().trim().min(1).max(1500),
+    }),
+  ),
+  gaps: z.array(
+    z.object({
+      title: z.string().trim().min(1).max(200),
+      detail: z.string().trim().min(1).max(1500),
+    }),
+  ),
+  suggested_opportunity_areas: z.array(z.string().trim().min(1).max(200)),
+  model: z.string().min(1),
+  prompt_version: z.string().min(1),
+});
+
+export type CapabilityInsightsResult = z.infer<typeof capabilityInsightsSchema>;
+
+export interface CapabilityInsightsInput {
+  organizationName: string;
+  capabilityDocument: string;
+  industries: string[];
+  solutionTypes: string[];
+  completionPercentage: number;
+  openOpportunityTitles: string[];
+}
+
+/**
+ * Asks the AI service to read the vendor's capability document and describe how
+ * the organisation is positioned for public procurement. Like every other AI
+ * call in the platform this is advisory: the output is stored as insight text
+ * shown to the vendor, and nothing in the matching or verification path reads
+ * it back.
+ */
+export async function requestCapabilityInsights(
+  input: CapabilityInsightsInput,
+): Promise<CapabilityInsightsResult> {
+  const config = loadConfig();
+
+  let response: Response;
+  try {
+    response = await fetch(`${config.aiServiceUrl}/internal/v1/vendor-capability-insights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        organization_name: input.organizationName,
+        capability_document: input.capabilityDocument,
+        industries: input.industries,
+        solution_types: input.solutionTypes,
+        completion_percentage: input.completionPercentage,
+        open_opportunity_titles: input.openOpportunityTitles,
+      }),
+      signal: AbortSignal.timeout(config.aiServiceTimeoutMs),
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    throw new ApiError(
+      503,
+      "AI_SERVICE_UNAVAILABLE",
+      timedOut
+        ? "The AI service did not respond within the allowed time."
+        : "The AI service could not be reached.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      502,
+      "AI_SERVICE_ERROR",
+      `The AI service returned an error (HTTP ${response.status}).`,
+    );
+  }
+
+  const parsed = capabilityInsightsSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "AI_OUTPUT_INVALID",
+      "The AI service returned output that failed validation.",
+    );
+  }
+
+  return parsed.data;
+}

@@ -1,8 +1,9 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
 
+import { getCurrentUser } from "../auth/currentUser.js";
+import { requirePermission } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errors.js";
-import { getCurrentOfficial } from "../repositories/currentOfficial.js";
 import { findProjectById } from "../repositories/projects.js";
 import { listRequirements } from "../repositories/requirements.js";
 import {
@@ -113,13 +114,13 @@ function routeParam(request: Request, name: string): string | undefined {
   return (request.params as Record<string, string | undefined>)[name];
 }
 
-async function loadProject(projectIdRaw: string | undefined) {
+async function loadProject(request: Request, projectIdRaw: string | undefined) {
   const parsed = uuidSchema.safeParse(projectIdRaw);
   if (!parsed.success) {
     throw new ApiError(404, "NOT_FOUND", "Procurement project was not found.");
   }
 
-  const official = await getCurrentOfficial();
+  const official = getCurrentUser(request);
   const project = await findProjectById(parsed.data, official.organizationId);
   if (project === undefined) {
     throw new ApiError(404, "NOT_FOUND", "Procurement project was not found.");
@@ -132,9 +133,9 @@ async function loadProject(projectIdRaw: string | undefined) {
 export const projectWorkPackagesRouter: Router = Router({ mergeParams: true });
 
 // GET /api/v1/projects/:projectId/work-packages
-projectWorkPackagesRouter.get("/", async (request, response, next) => {
+projectWorkPackagesRouter.get("/", requirePermission("workpackage:read"), async (request, response, next) => {
   try {
-    const { project } = await loadProject(routeParam(request, "projectId"));
+    const { project } = await loadProject(request, routeParam(request, "projectId"));
     const includeDeleted = request.query.includeDeleted === "true";
 
     const [{ packages, summary }, analyses, history] = await Promise.all([
@@ -158,9 +159,9 @@ projectWorkPackagesRouter.get("/", async (request, response, next) => {
 });
 
 // POST /api/v1/projects/:projectId/work-packages/generate
-projectWorkPackagesRouter.post("/generate", async (request, response, next) => {
+projectWorkPackagesRouter.post("/generate", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
-    const { official, project } = await loadProject(routeParam(request, "projectId"));
+    const { official, project } = await loadProject(request, routeParam(request, "projectId"));
 
     if (
       project.status !== "REQUIREMENTS_CONFIRMED" &&
@@ -221,9 +222,9 @@ projectWorkPackagesRouter.post("/generate", async (request, response, next) => {
 });
 
 // POST /api/v1/projects/:projectId/work-packages/manual
-projectWorkPackagesRouter.post("/manual", async (request, response, next) => {
+projectWorkPackagesRouter.post("/manual", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
-    const { official, project } = await loadProject(routeParam(request, "projectId"));
+    const { official, project } = await loadProject(request, routeParam(request, "projectId"));
 
     const parsed = manualPackageSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -250,9 +251,9 @@ projectWorkPackagesRouter.post("/manual", async (request, response, next) => {
 });
 
 // POST /api/v1/projects/:projectId/work-packages/no-decomposition
-projectWorkPackagesRouter.post("/no-decomposition", async (request, response, next) => {
+projectWorkPackagesRouter.post("/no-decomposition", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
-    const { official, project } = await loadProject(routeParam(request, "projectId"));
+    const { official, project } = await loadProject(request, routeParam(request, "projectId"));
 
     const singlePackage = await createNoDecompositionWorkPackage(project.id, official.id);
 
@@ -269,9 +270,9 @@ projectWorkPackagesRouter.post("/no-decomposition", async (request, response, ne
 });
 
 // POST /api/v1/projects/:projectId/work-packages/confirm
-projectWorkPackagesRouter.post("/confirm", async (request, response, next) => {
+projectWorkPackagesRouter.post("/confirm", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
-    const { official, project } = await loadProject(routeParam(request, "projectId"));
+    const { official, project } = await loadProject(request, routeParam(request, "projectId"));
 
     const result = await validateAndConfirmWorkPackages(project.id, official.id);
 
@@ -287,9 +288,9 @@ projectWorkPackagesRouter.post("/confirm", async (request, response, next) => {
 });
 
 // POST /api/v1/projects/:projectId/work-packages/reorder
-projectWorkPackagesRouter.post("/reorder", async (request, response, next) => {
+projectWorkPackagesRouter.post("/reorder", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
-    const { official, project } = await loadProject(routeParam(request, "projectId"));
+    const { official, project } = await loadProject(request, routeParam(request, "projectId"));
 
     const parsed = reorderSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -308,7 +309,7 @@ projectWorkPackagesRouter.post("/reorder", async (request, response, next) => {
 export const directWorkPackagesRouter: Router = Router();
 
 // GET /api/v1/work-packages/:id
-directWorkPackagesRouter.get("/:id", async (request, response, next) => {
+directWorkPackagesRouter.get("/:id", requirePermission("workpackage:read"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
@@ -326,7 +327,7 @@ directWorkPackagesRouter.get("/:id", async (request, response, next) => {
 });
 
 // PUT /api/v1/work-packages/:id
-directWorkPackagesRouter.put("/:id", async (request, response, next) => {
+directWorkPackagesRouter.put("/:id", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
@@ -337,7 +338,7 @@ directWorkPackagesRouter.put("/:id", async (request, response, next) => {
       throw validationError(parsedBody.error.issues, "Invalid update payload.");
     }
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const updated = await updateWorkPackage(parsedId.data, official.id, parsedBody.data);
 
     response.json({ data: updated });
@@ -347,13 +348,13 @@ directWorkPackagesRouter.put("/:id", async (request, response, next) => {
 });
 
 // DELETE /api/v1/work-packages/:id (Soft delete)
-directWorkPackagesRouter.delete("/:id", async (request, response, next) => {
+directWorkPackagesRouter.delete("/:id", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) throw new ApiError(404, "NOT_FOUND", "Work package not found.");
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const reason = typeof request.body?.reason === "string" ? request.body.reason : undefined;
 
     await softDeleteWorkPackage(parsedId.data, official.id, reason);
@@ -365,13 +366,13 @@ directWorkPackagesRouter.delete("/:id", async (request, response, next) => {
 });
 
 // POST /api/v1/work-packages/:id/accept
-directWorkPackagesRouter.post("/:id/accept", async (request, response, next) => {
+directWorkPackagesRouter.post("/:id/accept", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) throw new ApiError(404, "NOT_FOUND", "Work package not found.");
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const accepted = await acceptWorkPackage(parsedId.data, official.id);
 
     response.json({ data: accepted });
@@ -381,7 +382,7 @@ directWorkPackagesRouter.post("/:id/accept", async (request, response, next) => 
 });
 
 // POST /api/v1/work-packages/:id/reject
-directWorkPackagesRouter.post("/:id/reject", async (request, response, next) => {
+directWorkPackagesRouter.post("/:id/reject", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
@@ -392,7 +393,7 @@ directWorkPackagesRouter.post("/:id/reject", async (request, response, next) => 
       throw validationError(parsedBody.error.issues, "A rejection reason is required.");
     }
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const rejected = await rejectWorkPackage(parsedId.data, official.id, parsedBody.data.reason);
 
     response.json({ data: rejected });
@@ -402,13 +403,13 @@ directWorkPackagesRouter.post("/:id/reject", async (request, response, next) => 
 });
 
 // POST /api/v1/work-packages/:id/restore
-directWorkPackagesRouter.post("/:id/restore", async (request, response, next) => {
+directWorkPackagesRouter.post("/:id/restore", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) throw new ApiError(404, "NOT_FOUND", "Work package not found.");
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const restored = await restoreWorkPackage(parsedId.data, official.id);
 
     response.json({ data: restored });
@@ -418,13 +419,13 @@ directWorkPackagesRouter.post("/:id/restore", async (request, response, next) =>
 });
 
 // POST /api/v1/work-packages/:id/duplicate
-directWorkPackagesRouter.post("/:id/duplicate", async (request, response, next) => {
+directWorkPackagesRouter.post("/:id/duplicate", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
     if (!parsedId.success) throw new ApiError(404, "NOT_FOUND", "Work package not found.");
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const duplicated = await duplicateWorkPackage(parsedId.data, official.id);
 
     response.status(201).json({ data: duplicated });
@@ -434,14 +435,14 @@ directWorkPackagesRouter.post("/:id/duplicate", async (request, response, next) 
 });
 
 // POST /api/v1/work-packages/merge
-directWorkPackagesRouter.post("/merge", async (request, response, next) => {
+directWorkPackagesRouter.post("/merge", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const parsed = mergeSchema.safeParse(request.body);
     if (!parsed.success) {
       throw validationError(parsed.error.issues, "Invalid merge parameters.");
     }
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const merged = await mergeWorkPackages(
       parsed.data.projectId,
       parsed.data.packageIds,
@@ -465,7 +466,7 @@ directWorkPackagesRouter.post("/merge", async (request, response, next) => {
 });
 
 // POST /api/v1/work-packages/:id/split
-directWorkPackagesRouter.post("/:id/split", async (request, response, next) => {
+directWorkPackagesRouter.post("/:id/split", requirePermission("workpackage:manage"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);
@@ -476,7 +477,7 @@ directWorkPackagesRouter.post("/:id/split", async (request, response, next) => {
       throw validationError(parsed.error.issues, "Invalid split configuration.");
     }
 
-    const official = await getCurrentOfficial();
+    const official = getCurrentUser(request);
     const splitPackages = await splitWorkPackage(
       parsedId.data,
       official.id,
@@ -494,7 +495,7 @@ directWorkPackagesRouter.post("/:id/split", async (request, response, next) => {
 });
 
 // GET /api/v1/work-packages/:id/history
-directWorkPackagesRouter.get("/:id/history", async (request, response, next) => {
+directWorkPackagesRouter.get("/:id/history", requirePermission("workpackage:read"), async (request, response, next) => {
   try {
     const id = routeParam(request, "id");
     const parsedId = uuidSchema.safeParse(id);

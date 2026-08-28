@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.providers.factory import build_provider
-from app.routers import requirement_analysis, work_packages
+from app.routers import requirement_analysis, vendor_capability, work_packages
 from app.schemas import HealthResponse
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,7 @@ app = FastAPI(
 
 app.include_router(requirement_analysis.router)
 app.include_router(work_packages.router)
+app.include_router(vendor_capability.router)
 
 
 @app.get("/health", response_model=HealthResponse)

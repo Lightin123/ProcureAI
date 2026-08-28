@@ -18,6 +18,7 @@ import {
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
+import { useHasPermission } from "../auth/AuthContext.js";
 import {
   RobotIcon,
   CheckCircleIcon,
@@ -127,9 +128,17 @@ export function ProjectRequirementsPage() {
   }
 
   const status = view?.projectStatus ?? "";
+  const hasPermission = useHasPermission();
+  const mayAnalyse = hasPermission("requirements:analyze");
+  const mayDecide = hasPermission("requirements:decide");
+  const mayAnswer = hasPermission("clarification:answer");
+  const mayTransition = hasPermission("workflow:transition");
+
+  // Workflow state decides whether an action is available; the permission
+  // decides whether this user may see it at all. The API enforces both again.
   const canAnalyse = status === "DRAFT" || status === "REQUIREMENTS_ANALYSIS";
-  const canConfirm = status === "REQUIREMENTS_ANALYSIS";
-  const canReopen = status === "REQUIREMENTS_CONFIRMED";
+  const canConfirm = mayTransition && status === "REQUIREMENTS_ANALYSIS";
+  const canReopen = mayTransition && status === "REQUIREMENTS_CONFIRMED";
   const openClarifications = (view?.clarifications ?? []).filter((item) => item.status === "OPEN");
   const latestRun = view?.analysisRuns[0];
 
@@ -241,6 +250,7 @@ export function ProjectRequirementsPage() {
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {mayAnalyse && (
               <button
                 type="button"
                 className="gov-btn gov-btn--primary"
@@ -255,6 +265,7 @@ export function ProjectRequirementsPage() {
                 <RobotIcon size={16} />
                 {busy ? "Running Analysis…" : latestRun === undefined ? "Run AI Analysis" : "Re-run Analysis"}
               </button>
+              )}
 
               {canConfirm && (
                 <button
@@ -363,6 +374,16 @@ export function ProjectRequirementsPage() {
                     </strong>
                     <p style={{ margin: 0, color: "var(--gov-text-primary)" }}>{question.answerText}</p>
                   </div>
+                ) : !mayAnswer ? (
+                  <p
+                    style={{
+                      margin: "10px 0 0",
+                      color: "var(--gov-text-muted)",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Awaiting a response from the procuring official.
+                  </p>
                 ) : (
                   <div style={{ marginTop: "14px" }}>
                     <label
@@ -514,6 +535,7 @@ export function ProjectRequirementsPage() {
                       </div>
                     )}
 
+                    {mayDecide && (
                     <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
                       <button
                         type="button"
@@ -551,6 +573,7 @@ export function ProjectRequirementsPage() {
                         Reject
                       </button>
                     </div>
+                    )}
                   </>
                 )}
               </article>
@@ -558,6 +581,7 @@ export function ProjectRequirementsPage() {
           </GovernmentCard>
 
           {/* Add Requirement Manually */}
+          {mayDecide && (
           <GovernmentCard
             title={
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -644,6 +668,7 @@ export function ProjectRequirementsPage() {
               </div>
             </form>
           </GovernmentCard>
+          )}
 
           {/* Workflow Audit History */}
           <GovernmentCard

@@ -1,6 +1,8 @@
 from typing import Protocol
 
 from app.schemas import (
+    CapabilityInsightsRequest,
+    CapabilityInsightsResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     WorkPackageDecompositionRequest,
@@ -21,6 +23,10 @@ class RequirementAnalysisProvider(Protocol):
     async def decompose_work_packages(
         self, request: WorkPackageDecompositionRequest
     ) -> WorkPackageDecompositionResponse: ...
+
+    async def capability_insights(
+        self, request: CapabilityInsightsRequest
+    ) -> CapabilityInsightsResponse: ...
 
 
 class ProviderError(RuntimeError):

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { getProject, type ProcurementProject } from "../api/projects.js";
+import { useHasPermission } from "../auth/AuthContext.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
@@ -13,6 +14,7 @@ import {
   RobotIcon,
   ChevronRightIcon,
 } from "../components/GovernmentIcons.js";
+import { OpportunityPublicationPanel } from "../components/OpportunityPublicationPanel.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
 import { ProjectStatusBadge } from "../components/ProjectStatusBadge.js";
@@ -35,6 +37,7 @@ function formatDateTime(value: string): string {
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const hasPermission = useHasPermission();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
 
   const load = useCallback(
@@ -156,9 +159,11 @@ export function ProjectDetailPage() {
               </div>
 
               <div className="gov-desc-item">
-                <dt className="gov-desc-term">Procurement Classification</dt>
+                <dt className="gov-desc-term">Supplier Visibility</dt>
                 <dd className="gov-desc-val">
-                  Smart Automation & AI Decision Support
+                  {state.project.publishedAt === null
+                    ? "Not published to suppliers"
+                    : `Published · ${state.project.interestCount} supplier(s) interested`}
                 </dd>
               </div>
             </dl>
@@ -189,7 +194,13 @@ export function ProjectDetailPage() {
             </div>
           </GovernmentCard>
 
-          {/* Next Steps Callout */}
+          <OpportunityPublicationPanel
+            project={state.project}
+            onChange={(project) => setState({ kind: "loaded", project })}
+          />
+
+          {/* Next Steps Callout — an action prompt, so only for users who may act */}
+          {hasPermission("requirements:analyze") && (
           <GovernmentAlert
             type="info"
             title="Next Step: AI Requirement Extraction & Structured Review"
@@ -207,6 +218,7 @@ export function ProjectDetailPage() {
               <ChevronRightIcon size={14} />
             </Link>
           </GovernmentAlert>
+          )}
         </>
       )}
     </>

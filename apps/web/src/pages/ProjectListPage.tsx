@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { listProjects, type ProcurementProject } from "../api/projects.js";
+import { useHasPermission } from "../auth/AuthContext.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
@@ -34,6 +35,7 @@ export function ProjectListPage() {
   const pageSize = 10;
 
   const navigate = useNavigate();
+  const hasPermission = useHasPermission();
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -121,14 +123,16 @@ export function ProjectListPage() {
         title="Procurement Projects"
         subtitle="National Public Procurement Decision Support Register — Ministry of Commerce & Industry"
         action={
-          <button
-            type="button"
-            className="gov-btn gov-btn--primary gov-btn--lg"
-            onClick={() => void navigate("/projects/new")}
-          >
-            <PlusIcon size={18} />
-            Create Procurement Project
-          </button>
+          hasPermission("project:create") ? (
+            <button
+              type="button"
+              className="gov-btn gov-btn--primary gov-btn--lg"
+              onClick={() => void navigate("/projects/new")}
+            >
+              <PlusIcon size={18} />
+              Create Procurement Project
+            </button>
+          ) : undefined
         }
       />
 
@@ -212,7 +216,9 @@ export function ProjectListPage() {
               <p style={{ color: "var(--gov-text-secondary)", margin: "0 0 16px", fontSize: "14px" }}>
                 {searchQuery || selectedDepartment !== "ALL" || selectedStatus !== "ALL"
                   ? "Try resetting your search query or filters."
-                  : "No procurement projects have been recorded yet. Click 'Create Procurement Project' to initiate."}
+                  : hasPermission("project:create")
+                    ? "No procurement projects have been recorded yet. Click 'Create Procurement Project' to initiate."
+                    : "No procurement projects have been recorded for your department yet."}
               </p>
               {(searchQuery || selectedDepartment !== "ALL" || selectedStatus !== "ALL") && (
                 <button

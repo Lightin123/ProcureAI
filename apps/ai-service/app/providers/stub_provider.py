@@ -3,11 +3,15 @@ import re
 import time
 
 from app.prompts.requirement_analysis import PROMPT_VERSION as REQ_PROMPT_VERSION
+from app.prompts.vendor_capability import PROMPT_VERSION as CAPABILITY_PROMPT_VERSION
 from app.prompts.work_package_decomposition import (
     PROMPT_VERSION as WP_PROMPT_VERSION,
     build_work_package_prompt,
 )
 from app.schemas import (
+    CapabilityInsight,
+    CapabilityInsightsRequest,
+    CapabilityInsightsResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     RequirementCategory,
@@ -240,6 +244,172 @@ class StubProvider:
             completion_id="stub-wp-001",
             response_time_ms=response_time_ms,
             overall_confidence=0.90,
+        )
+
+    async def capability_insights(
+        self, request: CapabilityInsightsRequest
+    ) -> CapabilityInsightsResponse:
+        """Section-presence heuristics over the capability document.
+
+        It reads which sections the supplier actually filled in and reports on
+        that. Deliberately not an assessment engine, but honest: it never
+        asserts a strength the profile does not contain, which is the property
+        that matters for a decision-support tool running without credentials.
+        """
+        document = request.capability_document
+        sections = {
+            "offerings": "PRODUCTS, SERVICES AND CAPABILITIES OFFERED" in document,
+            "experience": "EXPERIENCE AND PAST PERFORMANCE" in document,
+            "credentials": "CERTIFICATIONS, STANDARDS AND RECOGNITION" in document,
+            "capacity": "CAPACITY AND OPERATIONS" in document,
+            "innovation": "INNOVATION PROFILE" in document,
+            "industry_detail": "INDUSTRY-SPECIFIC CAPABILITY DETAIL" in document,
+            "eligibility": "ELIGIBILITY CATEGORIES" in document,
+        }
+
+        strengths: list[CapabilityInsight] = []
+        gaps: list[CapabilityInsight] = []
+
+        if sections["offerings"]:
+            strengths.append(
+                CapabilityInsight(
+                    title="Offerings are itemised",
+                    detail=(
+                        "Products and services are recorded individually, so each is "
+                        "matched to procurement requirements on its own merits rather "
+                        "than only through the organisation summary."
+                    ),
+                )
+            )
+        else:
+            gaps.append(
+                CapabilityInsight(
+                    title="No individual products or services recorded",
+                    detail=(
+                        "Matching currently sees only the capability summary. Record each "
+                        "product or service separately so it can be found on its own."
+                    ),
+                )
+            )
+
+        if sections["experience"]:
+            strengths.append(
+                CapabilityInsight(
+                    title="Delivery record is documented",
+                    detail=(
+                        "Previous work is recorded with clients and outcomes, which is the "
+                        "evidence government buyers weigh most heavily at shortlisting."
+                    ),
+                )
+            )
+        else:
+            gaps.append(
+                CapabilityInsight(
+                    title="No delivery record",
+                    detail=(
+                        "No previous projects are recorded. Private-sector and pilot work "
+                        "both count; an empty record is the most common reason a capable "
+                        "supplier is passed over."
+                    ),
+                )
+            )
+
+        if sections["credentials"]:
+            strengths.append(
+                CapabilityInsight(
+                    title="Formal credentials are on record",
+                    detail=(
+                        "Certifications and standards are recorded, which is what allows "
+                        "the profile to pass mandatory-standard filters."
+                    ),
+                )
+            )
+        else:
+            gaps.append(
+                CapabilityInsight(
+                    title="No certifications or standards recorded",
+                    detail=(
+                        "Many tenders state a mandatory standard as an eligibility "
+                        "condition. Without a recorded credential the profile is filtered "
+                        "out before assessment."
+                    ),
+                )
+            )
+
+        if sections["industry_detail"]:
+            strengths.append(
+                CapabilityInsight(
+                    title="Sector-specific detail is present",
+                    detail=(
+                        "The profile answers the questions specific to its declared "
+                        "industries, which distinguishes it from generic listings."
+                    ),
+                )
+            )
+
+        if not sections["capacity"]:
+            gaps.append(
+                CapabilityInsight(
+                    title="Execution capacity is not stated",
+                    detail=(
+                        "Buyers need to judge whether the organisation can absorb the "
+                        "volume. State team size, throughput and typical project value."
+                    ),
+                )
+            )
+
+        if not sections["innovation"]:
+            gaps.append(
+                CapabilityInsight(
+                    title="Maturity and readiness are not stated",
+                    detail=(
+                        "Without a stated readiness level, an emerging solution cannot be "
+                        "considered for pilot procurement."
+                    ),
+                )
+            )
+
+        if request.completion_percentage < 70:
+            gaps.append(
+                CapabilityInsight(
+                    title=f"Profile is {request.completion_percentage}% complete",
+                    detail=(
+                        "Incomplete profiles score lower in matching because there is "
+                        "less to match against. Completing the outstanding sections is "
+                        "the single fastest improvement available."
+                    ),
+                )
+            )
+
+        industries = ", ".join(request.industries) if request.industries else "its declared sector"
+        summary = (
+            f"{request.organization_name} presents as a supplier operating in {industries}. "
+            f"The profile is {request.completion_percentage}% complete and records "
+            f"{sum(1 for present in sections.values() if present)} of "
+            f"{len(sections)} capability sections. "
+        )
+        summary += (
+            "The recorded material is sufficient for the platform to match this supplier "
+            "against published requirements."
+            if request.completion_percentage >= 70
+            else "Further detail is needed before the platform can match this supplier "
+            "reliably against published requirements."
+        )
+
+        areas = [
+            title
+            for title in request.open_opportunity_titles[:5]
+        ] or [
+            f"Procurement in {industry}" for industry in request.industries[:3]
+        ]
+
+        return CapabilityInsightsResponse(
+            positioning_summary=summary,
+            strengths=strengths,
+            gaps=gaps,
+            suggested_opportunity_areas=areas,
+            model="stub-deterministic-v1",
+            prompt_version=CAPABILITY_PROMPT_VERSION,
         )
 
 

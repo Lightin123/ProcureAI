@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 
-import { fetchHealth, type HealthResponse } from "../api/health.js";
+import { fetchSystemStatus, type SystemStatus } from "../api/system.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
@@ -10,7 +10,7 @@ import { StatusBadge, type StatusTone } from "../components/StatusBadge.js";
 
 type ConnectionState =
   | { kind: "checking" }
-  | { kind: "online"; health: HealthResponse; checkedAt: Date }
+  | { kind: "online"; status: SystemStatus; checkedAt: Date }
   | { kind: "offline"; message: string; checkedAt: Date };
 
 interface ComponentRow {
@@ -38,8 +38,8 @@ export function SystemStatusPage() {
     setConnection({ kind: "checking" });
 
     try {
-      const health = await fetchHealth(signal);
-      setConnection({ kind: "online", health, checkedAt: new Date() });
+      const status = await fetchSystemStatus(signal);
+      setConnection({ kind: "online", status, checkedAt: new Date() });
     } catch (error) {
       if (signal?.aborted === true) {
         return;
@@ -64,18 +64,29 @@ export function SystemStatusPage() {
         ? { name: "Backend API Service", detail: backendDetail, tone: "unavailable", label: "Unavailable" }
         : { name: "Backend API Service", detail: backendDetail, tone: "pending", label: "Checking" };
 
-  const databaseConnected = connection.kind === "online" && connection.health.database === "connected";
+  const databaseConnected = connection.kind === "online" && connection.status.database === "connected";
   const databaseRow: ComponentRow = databaseConnected
     ? { name: "PostgreSQL Database", detail: "PostgreSQL with pgvector", tone: "operational", label: "Connected" }
     : connection.kind === "online"
       ? { name: "PostgreSQL Database", detail: "PostgreSQL with pgvector", tone: "unavailable", label: "Unavailable" }
       : { name: "PostgreSQL Database", detail: "PostgreSQL with pgvector", tone: "pending", label: "Unknown" };
 
+  const aiDetail =
+    connection.kind === "online" && connection.status.aiModel !== null
+      ? `FastAPI + Pydantic · ${connection.status.aiModel}`
+      : "FastAPI + Pydantic";
+  const aiRow: ComponentRow =
+    connection.kind === "online"
+      ? connection.status.aiService === "connected"
+        ? { name: "AI Decision Support Engine", detail: aiDetail, tone: "operational", label: "Operational" }
+        : { name: "AI Decision Support Engine", detail: aiDetail, tone: "unavailable", label: "Unavailable" }
+      : { name: "AI Decision Support Engine", detail: aiDetail, tone: "pending", label: "Unknown" };
+
   const componentRows: ComponentRow[] = [
     { name: "Web Portal Interface", detail: "React + Vite (UIDAI / GoI Design System)", tone: "operational", label: "Operational" },
     backendRow,
     databaseRow,
-    { name: "AI Decision Support Engine", detail: "FastAPI + Pydantic (Groq / OpenAI / Anthropic)", tone: "operational", label: "Operational" },
+    aiRow,
   ];
 
   return (
@@ -140,21 +151,21 @@ export function SystemStatusPage() {
           <div className="gov-desc-item">
             <dt className="gov-desc-term">Service Signature</dt>
             <dd className="gov-desc-val gov-desc-val--mono">
-              {connection.kind === "online" ? connection.health.service : "—"}
+              {connection.kind === "online" ? connection.status.service : "—"}
             </dd>
           </div>
 
           <div className="gov-desc-item">
             <dt className="gov-desc-term">Database State</dt>
             <dd className="gov-desc-val gov-desc-val--mono">
-              {connection.kind === "online" ? connection.health.database : "—"}
+              {connection.kind === "online" ? connection.status.database : "—"}
             </dd>
           </div>
 
           <div className="gov-desc-item">
             <dt className="gov-desc-term">Server Timestamp</dt>
             <dd className="gov-desc-val gov-desc-val--mono">
-              {connection.kind === "online" ? connection.health.timestamp : "—"}
+              {connection.kind === "online" ? connection.status.checkedAt : "—"}
             </dd>
           </div>
 

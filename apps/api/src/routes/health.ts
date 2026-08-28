@@ -1,26 +1,20 @@
 import { Router } from "express";
 
-import { checkDatabaseConnection } from "../db/pool.js";
-import { checkAiService } from "../services/aiClient.js";
-
 const SERVICE_NAME = "procureai-api";
 
 export const healthRouter: Router = Router();
 
-healthRouter.get("/health", async (_request, response) => {
-  const [databaseConnected, aiService] = await Promise.all([
-    checkDatabaseConnection(),
-    checkAiService(),
-  ]);
-
+/**
+ * Public liveness probe (D18). Deliberately minimal: it confirms the process is
+ * up and answers nothing about internal infrastructure. Database connectivity,
+ * AI service state, and the configured provider and model are diagnostics that
+ * name internal components, so they live behind authentication on
+ * `GET /api/v1/system/status` instead (D54).
+ */
+healthRouter.get("/health", (_request, response) => {
   response.json({
     status: "ok",
     service: SERVICE_NAME,
-    milestone: "3 - AI Requirement Analysis",
-    database: databaseConnected ? "connected" : "unavailable",
-    aiService: aiService === null ? "unavailable" : "connected",
-    aiProvider: aiService?.provider ?? null,
-    aiModel: aiService?.model ?? null,
     timestamp: new Date().toISOString(),
   });
 });

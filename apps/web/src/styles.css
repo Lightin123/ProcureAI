@@ -1458,3 +1458,164 @@ a:hover {
     flex: 1;
   }
 }
+
+/* ==========================================================================
+   Work Package Cards & Components
+   ========================================================================== */
+
+.gov-wp-card {
+  background-color: var(--gov-bg-surface);
+  border: 1px solid var(--gov-border);
+  border-left: 4px solid var(--gov-primary);
+  border-radius: var(--gov-radius);
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all var(--gov-transition);
+}
+
+.gov-wp-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.gov-wp-card--selected {
+  border-color: var(--gov-primary);
+  background-color: var(--gov-primary-subtle);
+  box-shadow: 0 0 0 2px var(--gov-primary-light);
+}
+
+.gov-wp-card--deleted {
+  opacity: 0.65;
+  border-left-color: var(--gov-text-muted);
+  background-color: #FAFAFA;
+}
+
+.gov-wp-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gov-border-light);
+}
+
+.gov-wp-card__footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gov-border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   Government Modal & Dialog System (with full scroll support)
+   ========================================================================== */
+
+.gov-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(18, 60, 105, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.gov-modal-dialog {
+  background-color: var(--gov-bg-surface);
+  border: 1px solid var(--gov-border-strong);
+  border-top: 4px solid var(--gov-primary);
+  border-radius: var(--gov-radius);
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: govModalFadeIn 0.2s ease-out;
+  margin: auto;
+  position: relative;
+}
+
+.gov-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gov-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--gov-bg-alt);
+  border-top-left-radius: var(--gov-radius);
+  border-top-right-radius: var(--gov-radius);
+  flex-shrink: 0;
+}
+
+.gov-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gov-primary-dark);
+}
+
+.gov-modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--gov-text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--gov-radius-sm);
+  transition: color var(--gov-transition), background-color var(--gov-transition);
+}
+
+.gov-modal-close-btn:hover {
+  background-color: var(--gov-bg-muted);
+  color: var(--gov-danger);
+}
+
+.gov-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+  max-height: calc(90vh - 140px);
+}
+
+.gov-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--gov-border);
+  background-color: var(--gov-bg-alt);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  border-bottom-left-radius: var(--gov-radius);
+  border-bottom-right-radius: var(--gov-radius);
+  flex-shrink: 0;
+}
+
+@keyframes govModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+

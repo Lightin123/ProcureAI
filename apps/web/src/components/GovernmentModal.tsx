@@ -21,6 +21,9 @@ export function GovernmentModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
@@ -28,14 +31,29 @@ export function GovernmentModal({
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="gov-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="gov-modal-dialog" ref={modalRef}>
+    <div
+      className="gov-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      onClick={handleBackdropClick}
+    >
+      <div className="gov-modal-dialog" ref={modalRef} onClick={(e) => e.stopPropagation()}>
         <div className="gov-modal-header">
           <h3 className="gov-modal-title" id="modal-title">
             {title}

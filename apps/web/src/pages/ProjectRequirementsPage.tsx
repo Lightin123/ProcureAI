@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { ApiRequestError } from "../api/client.js";
 import {
@@ -26,6 +26,7 @@ import {
   EditIcon,
   CheckIcon,
   CloseIcon,
+  LayersIcon,
 } from "../components/GovernmentIcons.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
@@ -277,16 +278,25 @@ export function ProjectRequirementsPage() {
               )}
 
               {canReopen && (
-                <button
-                  type="button"
-                  className="gov-btn gov-btn--tertiary"
-                  disabled={busy}
-                  onClick={() =>
-                    void perform(() => reopenRequirements(projectId), "Requirements reopened for revision.")
-                  }
-                >
-                  Reopen Requirements
-                </button>
+                <>
+                  <Link
+                    to={`/projects/${projectId}/work-packages`}
+                    className="gov-btn gov-btn--primary"
+                  >
+                    <LayersIcon size={16} />
+                    Proceed to Work Packages
+                  </Link>
+                  <button
+                    type="button"
+                    className="gov-btn gov-btn--tertiary"
+                    disabled={busy}
+                    onClick={() =>
+                      void perform(() => reopenRequirements(projectId), "Requirements reopened for revision.")
+                    }
+                  >
+                    Reopen Requirements
+                  </button>
+                </>
               )}
             </div>
 

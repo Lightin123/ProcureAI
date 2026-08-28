@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { FileTextIcon, RobotIcon } from "./GovernmentIcons.js";
+import { FileTextIcon, LayersIcon, RobotIcon } from "./GovernmentIcons.js";
 
 export function ProjectSectionNav({ projectId }: { projectId: string }) {
   const items = [
@@ -14,6 +14,12 @@ export function ProjectSectionNav({ projectId }: { projectId: string }) {
       to: `/projects/${projectId}/requirements`,
       label: "Requirements & AI Analysis",
       icon: <RobotIcon size={16} />,
+      end: false,
+    },
+    {
+      to: `/projects/${projectId}/work-packages`,
+      label: "Work Packages",
+      icon: <LayersIcon size={16} />,
       end: false,
     },
   ];

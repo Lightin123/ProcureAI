@@ -1,6 +1,12 @@
+import json
 import re
+import time
 
-from app.prompts.requirement_analysis import PROMPT_VERSION
+from app.prompts.requirement_analysis import PROMPT_VERSION as REQ_PROMPT_VERSION
+from app.prompts.work_package_decomposition import (
+    PROMPT_VERSION as WP_PROMPT_VERSION,
+    build_work_package_prompt,
+)
 from app.schemas import (
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
@@ -8,6 +14,11 @@ from app.schemas import (
     RequirementKind,
     SuggestedClarification,
     SuggestedRequirement,
+    SuggestedWorkPackage,
+    WorkPackageComplexity,
+    WorkPackageDecompositionRequest,
+    WorkPackageDecompositionResponse,
+    WorkPackagePriority,
 )
 
 BUDGET_PATTERN = re.compile(r"(budget|crore|lakh|\u20b9|rs\.?\s*\d)", re.IGNORECASE)
@@ -18,18 +29,13 @@ COMPLIANCE_PATTERN = re.compile(
 
 
 class StubProvider:
-    """Deterministic provider used when no Anthropic API key is configured.
-
-    It performs simple keyword detection so the full review workflow can be
-    exercised end to end without credentials. It is not an analysis engine and
-    its output is intentionally conservative.
-    """
+    """Deterministic provider used when no API key is configured or in fallback mode."""
 
     name = "stub"
 
     @property
     def model_name(self) -> str | None:
-        return None
+        return "stub-deterministic-v1"
 
     async def analyse(
         self, request: RequirementAnalysisRequest
@@ -112,7 +118,128 @@ class StubProvider:
             requirements=requirements,
             clarification_questions=clarifications,
             model="stub-deterministic-v1",
-            prompt_version=PROMPT_VERSION,
+            prompt_version=REQ_PROMPT_VERSION,
+        )
+
+    async def decompose_work_packages(
+        self, request: WorkPackageDecompositionRequest
+    ) -> WorkPackageDecompositionResponse:
+        start_time = time.time()
+        reqs = request.confirmed_requirements
+        req_ids = [r.id for r in reqs]
+
+        # Group requirements logically
+        functional_req_ids = [r.id for r in reqs if r.category == RequirementCategory.FUNCTIONAL]
+        infra_req_ids = [
+            r.id
+            for r in reqs
+            if r.category in (RequirementCategory.NON_FUNCTIONAL, RequirementCategory.TIMELINE)
+        ]
+        compliance_req_ids = [
+            r.id
+            for r in reqs
+            if r.category in (RequirementCategory.COMPLIANCE, RequirementCategory.BUDGET, RequirementCategory.OTHER)
+        ]
+
+        if not functional_req_ids and req_ids:
+            functional_req_ids = req_ids[: max(1, len(req_ids) // 2)]
+            infra_req_ids = req_ids[max(1, len(req_ids) // 2) :]
+
+        packages: list[SuggestedWorkPackage] = [
+            SuggestedWorkPackage(
+                title="Core Application Platform & Business Logic",
+                description=f"Design, implementation, and deployment of the primary software capabilities for '{request.project_title}'.",
+                scope="Includes core application modules, user interfaces, business workflow logic, API integrations, and administrative dashboards.",
+                included_requirement_ids=functional_req_ids or req_ids,
+                deliverables=[
+                    "System Architecture & Detailed Design Document (SDD)",
+                    "Modular Software Source Code and Executable Artifacts",
+                    "User Acceptance Testing (UAT) Sign-off Report",
+                    "Administrator & End-User Training Manuals",
+                ],
+                dependencies=["Cloud & Infrastructure Hosting Environment"],
+                complexity=WorkPackageComplexity.HIGH,
+                priority=WorkPackagePriority.CRITICAL,
+                estimated_procurement_category="Software Solution",
+                ai_reasoning="Consolidates central functional workflows into a cohesive software delivery package to ensure end-to-end operational readiness.",
+                confidence_score=0.92,
+            ),
+            SuggestedWorkPackage(
+                title="Cloud & Infrastructure Hosting Environment",
+                description="Provisioning of compute, network, database clusters, security perimeter, and high-availability deployment infrastructure.",
+                scope="Includes cloud instance sizing, container runtime orchestration, VPC/subnet firewall configuration, backup automation, and storage setup.",
+                included_requirement_ids=infra_req_ids,
+                deliverables=[
+                    "Infrastructure as Code (IaC) Templates",
+                    "Cloud Security Baseline & Network Architecture Diagram",
+                    "Disaster Recovery (DR) and Data Backup Runbooks",
+                    "Environment Provisioning Certificate",
+                ],
+                dependencies=[],
+                complexity=WorkPackageComplexity.MEDIUM,
+                priority=WorkPackagePriority.HIGH,
+                estimated_procurement_category="Cloud Services",
+                ai_reasoning="Underpins the runtime availability, scalability, and security posture necessary for software operations.",
+                confidence_score=0.88,
+            ),
+            SuggestedWorkPackage(
+                title="Security Compliance, Audit & Quality Assurance",
+                description="Independent cybersecurity review, CERT-In empaneled security audit, vulnerability assessment, and compliance verification.",
+                scope="Includes VAPT (Vulnerability Assessment & Penetration Testing), data protection guideline alignment, regulatory audit sign-offs, and compliance documentation.",
+                included_requirement_ids=compliance_req_ids,
+                deliverables=[
+                    "Third-Party CERT-In Empaneled Security Audit Certificate",
+                    "VAPT Remediation & Closure Report",
+                    "Data Protection & Compliance Dossier",
+                ],
+                dependencies=["Core Application Platform & Business Logic"],
+                complexity=WorkPackageComplexity.MEDIUM,
+                priority=WorkPackagePriority.HIGH,
+                estimated_procurement_category="Security & Audit Services",
+                ai_reasoning="Guarantees compliance with Government of India cybersecurity mandates and procurement risk frameworks prior to go-live.",
+                confidence_score=0.90,
+            ),
+            SuggestedWorkPackage(
+                title="Capacity Building, Training & Operational Maintenance Support",
+                description="Comprehensive user onboarding, institutional training sessions, operational handover, and 12-month post-implementation maintenance (AMC).",
+                scope="Includes nodal officer training workshops, train-the-trainer manuals, helpdesk setup, and SLA-governed level 1-3 technical support.",
+                included_requirement_ids=[],
+                deliverables=[
+                    "Departmental Training Sessions & Attendance Rosters",
+                    "Operations & Maintenance SLA Framework",
+                    "Quarterly SLA & Ticket Resolution Reports",
+                ],
+                dependencies=["Core Application Platform & Business Logic"],
+                complexity=WorkPackageComplexity.LOW,
+                priority=WorkPackagePriority.MEDIUM,
+                estimated_procurement_category="Operations & Maintenance",
+                ai_reasoning="Ensures institutional adoption and long-term sustainability across the nodal ministry/department.",
+                confidence_score=0.85,
+            ),
+        ]
+
+        user_prompt, prompt_hash = build_work_package_prompt(
+            project_title=request.project_title,
+            problem_description=request.problem_description,
+            organization_name=request.organization_name,
+            confirmed_requirements=[r.model_dump() for r in reqs],
+        )
+
+        response_time_ms = int((time.time() - start_time) * 1000)
+        raw_response = json.dumps({"work_packages": [p.model_dump() for p in packages]}, indent=2)
+
+        return WorkPackageDecompositionResponse(
+            work_packages=packages,
+            model="stub-deterministic-v1",
+            provider="stub",
+            prompt_version=WP_PROMPT_VERSION,
+            prompt_hash=prompt_hash,
+            raw_prompt=user_prompt,
+            raw_response=raw_response,
+            token_usage={"prompt_tokens": 520, "completion_tokens": 780, "total_tokens": 1300},
+            completion_id="stub-wp-001",
+            response_time_ms=response_time_ms,
+            overall_confidence=0.90,
         )
 
 

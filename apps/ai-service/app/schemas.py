@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,20 @@ class RequirementCategory(str, Enum):
     TIMELINE = "TIMELINE"
     COMPLIANCE = "COMPLIANCE"
     OTHER = "OTHER"
+
+
+class WorkPackageComplexity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+
+
+class WorkPackagePriority(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
 
 
 class ExistingRequirement(BaseModel):
@@ -54,6 +68,51 @@ class RequirementAnalysisResponse(BaseModel):
     clarification_questions: list[SuggestedClarification]
     model: str
     prompt_version: str
+
+
+# --- Work Package Decomposition Schemas ---
+
+class ConfirmedRequirementItem(BaseModel):
+    id: str
+    kind: RequirementKind
+    category: RequirementCategory
+    text: str
+    rationale: str | None = None
+
+
+class WorkPackageDecompositionRequest(BaseModel):
+    project_title: str = Field(min_length=1, max_length=200)
+    problem_description: str = Field(min_length=1, max_length=20_000)
+    organization_name: str | None = None
+    confirmed_requirements: list[ConfirmedRequirementItem] = Field(default_factory=list)
+
+
+class SuggestedWorkPackage(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=5_000)
+    scope: str = Field(min_length=1, max_length=5_000)
+    included_requirement_ids: list[str] = Field(default_factory=list)
+    deliverables: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    complexity: WorkPackageComplexity = WorkPackageComplexity.MEDIUM
+    priority: WorkPackagePriority = WorkPackagePriority.MEDIUM
+    estimated_procurement_category: str = Field(default="General Procurement")
+    ai_reasoning: str = Field(min_length=1, max_length=3_000)
+    confidence_score: float = Field(default=0.85, ge=0.0, le=1.0)
+
+
+class WorkPackageDecompositionResponse(BaseModel):
+    work_packages: list[SuggestedWorkPackage]
+    model: str
+    provider: str
+    prompt_version: str
+    prompt_hash: str
+    raw_prompt: str
+    raw_response: str
+    token_usage: dict[str, Any] = Field(default_factory=dict)
+    completion_id: str | None = None
+    response_time_ms: int = 0
+    overall_confidence: float = 0.85
 
 
 class HealthResponse(BaseModel):

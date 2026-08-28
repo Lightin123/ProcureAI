@@ -37,7 +37,8 @@ export function errorHandler(
   }
 
   console.error("Unhandled error:", error);
+  const message = error instanceof Error ? error.message : "An unexpected error occurred.";
   response.status(500).json({
-    error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred." },
+    error: { code: "INTERNAL_ERROR", message },
   });
 }

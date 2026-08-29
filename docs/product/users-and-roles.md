@@ -21,7 +21,10 @@ Responsibilities:
 - Answer AI-generated clarification questions.
 - Review, edit, approve, or reject AI-extracted requirements.
 - Review and adjust generated work packages.
-- Review discovered vendor candidates.
+- Review discovered vendor candidates, compare them side by side, and
+  shortlist them against a specific work package with a recorded reason.
+- Invite shortlisted suppliers to respond, and track who accepted, who
+  declined and why.
 - Review evaluations, rankings, and explanations.
 - Make and record the final procurement decision.
 
@@ -56,9 +59,10 @@ requirements, answer clarifications, or transition a workflow stage (D48).
 Represents a startup, manufacturer, service provider, or other solution
 provider that can be discovered and matched by the platform — not limited
 to technology companies. Vendor accounts exist, authenticate, self-register
-publicly, and onboard a capability profile (Milestone 6, implemented).
-Submitting a structured RFI response or proposal (rather than expressing
-interest in a published opportunity) is not yet implemented — see
+publicly, and onboard a capability profile (Milestone 6, implemented), and
+receive, open and answer work-package invitations (Milestone 7, implemented).
+Submitting a structured RFI response or proposal — as distinct from accepting
+an invitation to respond — is not yet implemented; see
 [../development-roadmap.md](../development-roadmap.md) Milestone 8.
 
 Responsibilities (implemented):
@@ -68,19 +72,28 @@ Responsibilities (implemented):
   compliance documents.
 - Discover published procurement opportunities matched against the
   profile, save opportunities, and register interest.
+- Receive an in-portal notification when a department issues an invitation,
+  open the invitation, review the work package it concerns, and **accept or
+  decline** — with a stated reason when declining.
 
-Responsibilities (planned, Milestones 7–8):
-- Receive invitations to specific work packages.
-- Submit RFI responses / proposals / quotations, distinct from the
-  unstructured "register interest" signal already implemented.
+Responsibilities (planned, Milestone 8):
+- Submit RFI responses / proposals / quotations, distinct from both the
+  unstructured "register interest" signal and the accept/decline already
+  implemented.
 
 Permissions: `vendor:profile:read`, `vendor:profile:manage`,
-`vendor:opportunity:read`, `vendor:opportunity:engage`. A vendor holds
-**no** project, requirement, workflow, or system-diagnostics permission —
-access to internal government data is not restricted by a check that could
-be bypassed, because there is no grant to bypass. Signing in as a vendor
-leads to the vendor portal; every procurement endpoint and the system-status
-endpoint return 403.
+`vendor:opportunity:read`, `vendor:opportunity:engage`,
+`vendor:invitation:read`, `vendor:invitation:respond`. A vendor holds
+**no** project, requirement, workflow, matching, shortlist or
+system-diagnostics permission — access to internal government data is not
+restricted by a check that could be bypassed, because there is no grant to
+bypass. Signing in as a vendor leads to the vendor portal; every procurement
+endpoint and the system-status endpoint return 403.
+
+The two invitation permissions are held by `VENDOR` alone, and
+`vendor:invitation:manage` by `GOVERNMENT_OFFICIAL` alone. No role holds both
+halves: the side that issues an invitation cannot answer it, and the side
+that answers it cannot see how it was selected (D76).
 
 ## Implemented Permission Matrix
 
@@ -112,6 +125,11 @@ authoritative mapping. This table mirrors that file.
 | `vendor:profile:manage` | — | — | Yes |
 | `vendor:opportunity:read` | — | — | Yes |
 | `vendor:opportunity:engage` | — | — | Yes |
+| `vendor:matching:read` | Yes | Yes | — |
+| `vendor:shortlist:manage` | Yes | — | — |
+| `vendor:invitation:manage` | Yes | — | — |
+| `vendor:invitation:read` | — | — | Yes |
+| `vendor:invitation:respond` | — | — | Yes |
 
 Every "Yes" is additionally scoped to the user's own organization — see
 [Organization Scope](#organization-scope) — **except** `vendor:registry:read`
@@ -121,7 +139,11 @@ their own department's (D60). `system:status:read` is withheld from vendors,
 who are external parties (D54). `opportunity:publish` governs an official
 exposing a confirmed project to the vendor portal (D57) — a separate act
 from `workflow:transition`. `user:manage` and `audit:read` are granted but
-have no endpoints yet (U30, U31).
+have no endpoints yet (U30, U31). `vendor:shortlist:manage` and
+`vendor:invitation:manage` are withheld from `ADMIN` for the same reason as
+every other decision permission: shortlisting and inviting a supplier are
+procurement acts, and they stay with the official who is accountable for them
+(D48, D60, D69).
 
 ## Organization Scope
 
@@ -144,9 +166,11 @@ The distinction between "Government Administrator" and "Procurement
 Administrator" was the long-standing open question U4. It is resolved by
 merging them (D46): the only thing that separated them was management of
 evaluation-criteria templates and compliance checklists, and neither exists
-before Milestone 7. Two roles indistinguishable in every implemented surface
-are one role with two names. If Milestone 7 makes them genuinely divergent,
-splitting is a data migration on a single column.
+yet. Two roles indistinguishable in every implemented surface are one role
+with two names. Milestone 7 did not make them divergent — it added
+shortlisting and invitation, both of which are official-only decision
+permissions that an administrator was already withheld from. If a later
+milestone does, splitting is a data migration on a single column.
 
 ### System Administrator — not implemented
 

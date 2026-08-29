@@ -1,7 +1,6 @@
 # Database Design
 
-**Status:** Substantially implemented through Milestone 5, in progress on
-Milestone 6. Migration `001_init.sql` (Milestone 2) created `organizations`,
+**Status:** Substantially implemented through Milestone 7. Migration `001_init.sql` (Milestone 2) created `organizations`,
 `users`, and `procurement_projects`; `002_requirement_analysis.sql`
 (Milestone 3) added requirement/clarification tracking;
 `003_work_packages.sql` (Milestone 4) added work-package decomposition and
@@ -13,7 +12,9 @@ added capability and work-package embeddings, match-run provenance,
 per-supplier match results, and the shortlist;
 `007_semantic_embeddings.sql` (Milestone 6, part 3) narrowed the vector
 columns to the current embedding model's 384 dimensions and added
-`vendor_profiles.semantic_document`. Evaluation of vendor
+`vendor_profiles.semantic_document`; `008_vendor_engagement.sql`
+(Milestone 7) added work-package invitations and linked the existing vendor
+notifications to them. Evaluation of vendor
 **responses** (Evaluation Criteria/Templates, Candidate Evaluations,
 Evaluation Runs over submitted proposals) remains conceptual and undesigned
 — see [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
@@ -174,7 +175,9 @@ vendor matching:
   `rank_at_shortlist`, `score_at_shortlist`, `reason`, `added_by`,
   `created_at`. Unique on `(work_package_id, vendor_profile_id)`. The rank
   and score are read server-side from the stored run, never accepted from a
-  request body.
+  request body. **Milestone 7 built the invitation on this table unchanged**
+  — no column was added to it, and it remains the sole precondition for
+  inviting a supplier.
 
 Added in Milestone 6, part 3
 (`apps/api/migrations/007_semantic_embeddings.sql`) — the consequences of
@@ -336,8 +339,67 @@ Milestone 9 and remains undesigned.
   of `work_package_match_results`, and excluded suppliers are retained in the
   same table with a null rank so the eligibility gate stays auditable.
   `work_package_shortlist` records which of those recommendations an official
-  acted on. Vendor invitation, RFI issue and response evaluation are
-  **not** modelled (D69).
+  acted on, and `work_package_invitations` records which of those shortlist
+  entries became an approach to the supplier and how the supplier answered
+  (Milestone 7). RFI issue and response evaluation are still **not** modelled.
+
+## Vendor Engagement (Milestone 7)
+
+Added by `apps/api/migrations/008_vendor_engagement.sql`. One new table, one
+new enum, six new labels on an existing enum, and one nullable column on an
+existing table — the milestone is deliberately small in the schema because
+the shortlist seam (D69) and the notification table were already there.
+
+- `work_package_invitations` — an invitation issued by a department to a
+  shortlisted supplier for one work package. `work_package_id` and
+  `project_id` (both cascading), `vendor_profile_id` (cascading),
+  `organization_id` (the **issuing department**, denormalised from the
+  project because "who invited us" is a fact the supplier is shown and
+  resolving it through two joins on every read saves nothing), `shortlist_id`
+  (ON DELETE SET NULL — dropping a shortlist entry must not delete the record
+  that the supplier was invited and what they answered), `status`, `message`,
+  `response_deadline`, `invited_by` / `invited_at`, `responded_by` /
+  `responded_at` / `response_note`, and `withdrawn_by` / `withdrawn_at` /
+  `withdrawal_reason`.
+
+  Two CHECK constraints keep the timestamps honest: a row is `ACCEPTED` or
+  `DECLINED` **iff** `responded_at` is set, and `WITHDRAWN` **iff**
+  `withdrawn_at` is set. A partial unique index over
+  `(work_package_id, vendor_profile_id) WHERE status IN ('INVITED','ACCEPTED')`
+  permits exactly one live invitation per supplier per package while leaving
+  withdrawn and declined invitations outside the constraint, so re-inviting
+  after either is a fresh, separately audited row (D75). Indexed on
+  `(work_package_id, invited_at DESC)` for the department's tracking view and
+  `(vendor_profile_id, invited_at DESC)` for the supplier's own list.
+
+- `work_package_invitation_status` — `INVITED`, `ACCEPTED`, `DECLINED`,
+  `WITHDRAWN`. An enum rather than free text for the same reason the vendor
+  profile and verification states are enums (D56): this is a fixed state
+  machine and the database should enforce it. There is no `EXPIRED` — see
+  D75.
+
+- `work_package_history_action` gains `SHORTLISTED`, `SHORTLIST_REMOVED`,
+  `INVITED`, `INVITATION_WITHDRAWN`, `INVITATION_ACCEPTED` and
+  `INVITATION_DECLINED` (D73). Shortlist and invitation decisions are audited
+  in the table every other work-package decision already writes to, with the
+  same actor / action / old / new / reason / timestamp shape. A supplier's
+  acceptance is recorded with the **supplier's** user as `actor_id`, so the
+  department does not appear in the record as the author of an acceptance it
+  did not make.
+
+- `vendor_notifications.invitation_id` — nullable, cascading. The existing
+  `link_path` already takes the supplier to the right page; this column is
+  what makes the relationship queryable, since "is this notification about a
+  live invitation" is not answerable from a URL string (D74). A partial index
+  on the unread predicate (`WHERE read_at IS NULL`) backs the header badge,
+  which is counted on every page load of the supplier portal.
+
+No table was added for the supplier's response: the response *is* the
+invitation's `status`, `responded_by`, `responded_at` and `response_note`. A
+separate `invitation_responses` table would model a one-to-one relationship
+as one-to-many and invite a second, contradictory answer to exist. The
+structured proposal that Milestone 8 collects is a genuinely different
+entity and will get its own table then.
 
 ## Embeddings / Vector Search
 
@@ -424,11 +486,17 @@ single global pattern decided here.
   was the answer: matching produces a *ranking over existing data* rather
   than *new suggested data*, so the mechanism is run provenance (D68) plus a
   shortlist entry that records the official's own act and the run it was
-  taken from (D69). Whether that generalises to evaluating submitted
-  responses is untested.
+  taken from (D69). Milestone 7 extended the same idea to engagement without
+  changing it: an invitation carries the shortlist entry it came from, and
+  every shortlist and invitation act is written to `work_package_history`
+  (D73). Whether this generalises to evaluating submitted responses is
+  untested.
 - Retention and comparison UX for multiple Evaluation / Recommendation Runs.
 - Schema for vendor submissions/responses (Milestone 8) and Vendor
   Memberships / Representatives (multiple staff per vendor organization).
+  The latter is now slightly more pressing: `work_package_invitations`
+  records `responded_by`, so an invitation is answered by a named person,
+  but a vendor organization still has exactly one user account to name.
 
 ## Related Documents
 

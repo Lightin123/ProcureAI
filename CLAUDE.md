@@ -42,10 +42,10 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1 through 5 are complete. **Milestone 6 (vendor ecosystem) is
-complete**, including work-package-level hybrid matching. Full status:
-[docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
-[docs/development-roadmap.md](docs/development-roadmap.md).
+Milestones 1 through 6 are complete, including work-package-level hybrid
+matching. **Milestone 7 (vendor shortlisting and engagement) is complete.**
+Full status: [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md)
+and [docs/development-roadmap.md](docs/development-roadmap.md).
 
 Implemented: React portal + Express API + PostgreSQL with pgvector + FastAPI
 AI service. Officials sign in, create projects, run AI requirement analysis,
@@ -55,7 +55,9 @@ complete a progressive onboarding, get verified by an administrator, and
 discover published opportunities matched against their profile. For a
 **confirmed work package**, an official runs supplier matching and receives a
 ranked, explainable list of eligible suppliers, can inspect who was excluded
-and on what ground, compare suppliers side by side, and shortlist them.
+and on what ground, compare suppliers side by side, shortlist them with a
+recorded reason, and invite the shortlisted ones. The supplier is notified in
+its own portal, opens the invitation, and accepts or declines.
 
 **Work-package vendor matching (`apps/api/src/matching/`).** Five stages, in
 separate modules, which must not be merged (D63):
@@ -100,6 +102,43 @@ Rules when touching this area:
   Cosine is not comparable across models — never hardcode a threshold in
   retrieval or ranking; add a calibrated row instead.
 
+**Vendor engagement (`work_package_invitations`, Milestone 7).** The
+shortlist from Milestone 6 is the seam the invitation is built on, and it was
+not changed:
+
+    ranked, eligible suppliers
+      -> shortlist        (work_package_shortlist)  — per work package, reason required
+      -> invitation       (work_package_invitations)
+      -> notification     (vendor_notifications)    — same request, no job (D74)
+      -> ACCEPTED | DECLINED | WITHDRAWN            — Milestone 8 follows an acceptance
+
+Rules when touching this area:
+
+- Eligibility is enforced **transitively**, through the shortlist. Do not add
+  a second eligibility check on the invitation path — a duplicated rule is a
+  rule that can drift from the gate.
+- Only a supplier on **that work package's** shortlist can be invited, and the
+  shortlist row is resolved server-side. Never accept a shortlist id, a
+  vendor id or an organization id from a request body as evidence of anything.
+- The supplier's view of an invitation is a **different query in a different
+  router** (D76). It must never carry a rank, a score, a dimension breakdown,
+  an eligibility verdict, a shortlist reason, or any other supplier. Do not
+  merge the two sides into one handler with a role flag.
+- Every vendor-facing lookup takes `vendorProfileId` from the session and
+  applies it in the `WHERE` clause. There is no "find by id" a vendor route
+  may call without it.
+- State transitions are conditional `UPDATE`s (`WHERE ... AND status =
+  'INVITED'`), not read-then-write. This is what makes them single-shot and
+  ownership-safe in one statement.
+- Shortlist and invitation acts are audited in `work_package_history` (D73),
+  not in a parallel table. A supplier's answer is attributed to the
+  supplier's own user.
+- There is no `EXPIRED` invitation state and no background job. A passed
+  deadline is derived at read time (D30, D75).
+- A PostgreSQL `date` is converted with `toIsoDay()` from
+  `repositories/dates.ts`, never with `toISOString().slice(0, 10)`, which
+  shifts the day backwards at IST (D77).
+
 **Authentication and RBAC are implemented (Milestone 5).** When touching the
 API, the rules are:
 
@@ -120,12 +159,11 @@ See [docs/engineering/security.md](docs/engineering/security.md) and
 [docs/product/users-and-roles.md](docs/product/users-and-roles.md).
 
 **Do not implement** until explicitly requested:
-- Vendor invitation and the engagement workflow around the shortlist —
-  Milestone 7. The shortlist itself exists only as a minimal seam (D69):
-  a table, add/remove endpoints, and a list in the matching page. Do not
-  build invitation, response tracking or evaluation on top of it.
 - RFI/proposal collection, document intelligence, response evaluation —
-  Milestones 8–9
+  Milestones 8–9. Milestone 7 stops at an accepted invitation: accepting
+  registers an intent to respond and is not a proposal, a quotation or an
+  award. Do not build a response form, a submission entity, deadline
+  enforcement or evaluation scoring on top of it.
 - Vendor gap analysis, procurement analytics — Milestone 10
 - Advanced semantic optimization (learned ranking, query expansion,
   reranking) — Milestone 11

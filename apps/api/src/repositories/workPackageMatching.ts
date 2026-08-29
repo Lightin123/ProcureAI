@@ -105,6 +105,17 @@ export interface ShortlistEntry {
   reason: string | null;
   addedByName: string;
   createdAt: string;
+
+  /**
+   * The engagement state of this shortlist entry: `null` until the supplier is
+   * invited, then the status of the most recent invitation. Carried on the
+   * shortlist rather than fetched separately because "shortlisted, not yet
+   * invited" and "shortlisted and declined" are the two states the official is
+   * deciding between when they look at this list.
+   */
+  invitationId: string | null;
+  invitationStatus: string | null;
+  invitedAt: string | null;
 }
 
 export async function listShortlist(workPackageId: string): Promise<ShortlistEntry[]> {
@@ -120,14 +131,30 @@ export async function listShortlist(workPackageId: string): Promise<ShortlistEnt
     reason: string | null;
     added_by_name: string;
     created_at: Date;
+    invitation_id: string | null;
+    invitation_status: string | null;
+    invited_at: Date | null;
   }>(
     `SELECT s.id, s.work_package_id, s.vendor_profile_id, o.name AS organization_name,
             p.legal_name, p.verification_state, s.rank_at_shortlist, s.score_at_shortlist,
-            s.reason, u.full_name AS added_by_name, s.created_at
+            s.reason, u.full_name AS added_by_name, s.created_at,
+            i.id AS invitation_id, i.status::text AS invitation_status, i.invited_at
      FROM work_package_shortlist s
      JOIN vendor_profiles p ON p.id = s.vendor_profile_id
      JOIN organizations o ON o.id = p.organization_id
      JOIN users u ON u.id = s.added_by
+     -- The most recent invitation for this supplier on this package. A lateral
+     -- rather than a join on the shortlist id, because an invitation survives
+     -- the shortlist entry it was issued from and a re-shortlisted supplier
+     -- would otherwise appear never to have been invited.
+     LEFT JOIN LATERAL (
+       SELECT inv.id, inv.status, inv.invited_at
+       FROM work_package_invitations inv
+       WHERE inv.work_package_id = s.work_package_id
+         AND inv.vendor_profile_id = s.vendor_profile_id
+       ORDER BY inv.invited_at DESC
+       LIMIT 1
+     ) i ON true
      WHERE s.work_package_id = $1
      ORDER BY s.created_at DESC`,
     [workPackageId],
@@ -145,6 +172,9 @@ export async function listShortlist(workPackageId: string): Promise<ShortlistEnt
     reason: row.reason,
     addedByName: row.added_by_name,
     createdAt: row.created_at.toISOString(),
+    invitationId: row.invitation_id,
+    invitationStatus: row.invitation_status,
+    invitedAt: row.invited_at?.toISOString() ?? null,
   }));
 }
 
@@ -208,10 +238,33 @@ export async function addToShortlist(input: {
   return { created: result.rows.length > 0 };
 }
 
+/**
+ * Removes a supplier from a work package's shortlist.
+ *
+ * Refused while an invitation to that supplier is still live. The department
+ * has told the supplier it is being invited; quietly dropping them from the
+ * list the invitation was issued from would leave an invitation whose basis no
+ * longer exists, and the supplier would still be looking at it. Withdrawing the
+ * invitation first is the deliberate act, and it is separately audited.
+ */
+export type ShortlistRemovalRefusal = "NOT_ON_SHORTLIST" | "INVITATION_OPEN";
+
 export async function removeFromShortlist(
   workPackageId: string,
   vendorProfileId: string,
-): Promise<boolean> {
+): Promise<{ removed: boolean; refusedBecause?: ShortlistRemovalRefusal }> {
+  const open = await query<{ id: string }>(
+    `SELECT id FROM work_package_invitations
+     WHERE work_package_id = $1 AND vendor_profile_id = $2
+       AND status IN ('INVITED', 'ACCEPTED')
+     LIMIT 1`,
+    [workPackageId, vendorProfileId],
+  );
+
+  if (open.rows.length > 0) {
+    return { removed: false, refusedBecause: "INVITATION_OPEN" };
+  }
+
   const result = await query<{ id: string }>(
     `DELETE FROM work_package_shortlist
      WHERE work_package_id = $1 AND vendor_profile_id = $2
@@ -219,7 +272,9 @@ export async function removeFromShortlist(
     [workPackageId, vendorProfileId],
   );
 
-  return result.rows.length > 0;
+  return result.rows.length > 0
+    ? { removed: true }
+    : { removed: false, refusedBecause: "NOT_ON_SHORTLIST" };
 }
 
 /**

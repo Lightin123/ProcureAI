@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ApiRequestError } from "../api/client.js";
 import {
   fetchDashboard,
+  markNotificationRead,
   markNotificationsRead,
   requestCapabilityInsights,
   type CapabilityInsights,
@@ -12,6 +13,7 @@ import {
 import { useCurrentUser } from "../auth/AuthContext.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
+import { MailIcon } from "../components/GovernmentIcons.js";
 import { PageHeader } from "../components/PageHeader.js";
 import {
   CompletionMeter,
@@ -97,6 +99,17 @@ export function VendorDashboardPage() {
     await load();
   }
 
+  /** Opening a notification is what marks that one read. */
+  async function openNotification(notificationId: string, unread: boolean) {
+    if (!unread) return;
+    try {
+      await markNotificationRead(notificationId);
+      await load();
+    } catch {
+      // Following the link matters more than recording that it was followed.
+    }
+  }
+
   if (state.kind === "loading") {
     return (
       <>
@@ -172,18 +185,72 @@ export function VendorDashboardPage() {
           <span className="gov-stat-card__meta">Published across all departments</span>
         </div>
         <div className="gov-stat-card gov-stat-card--success">
-          <span className="gov-stat-card__label">Interest Registered</span>
-          <span className="gov-stat-card__value">{counts.interestSubmitted}</span>
-          <span className="gov-stat-card__meta">{counts.savedOpportunities} saved for later</span>
+          <span className="gov-stat-card__label">Procurement Invitations</span>
+          <span className="gov-stat-card__value">{counts.invitationsAwaitingResponse}</span>
+          <span className="gov-stat-card__meta">
+            awaiting your response · {counts.invitations} received in total
+          </span>
         </div>
         <div className="gov-stat-card gov-stat-card--secondary">
-          <span className="gov-stat-card__label">Documents</span>
-          <span className="gov-stat-card__value">{counts.documents}</span>
+          <span className="gov-stat-card__label">Interest &amp; Documents</span>
+          <span className="gov-stat-card__value">{counts.interestSubmitted}</span>
           <span className="gov-stat-card__meta">
+            interest registered · {counts.documents} document(s),{" "}
             {counts.pendingDocuments} awaiting verification
           </span>
         </div>
       </div>
+
+      {dashboard.openInvitations.length > 0 && (
+        <GovernmentCard
+          title={
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <MailIcon size={18} />
+              <span>
+                Invitations awaiting your response ({dashboard.openInvitations.length})
+              </span>
+            </div>
+          }
+          subtitle="A department has invited your organisation to respond to a specific work package"
+          action={
+            <Link className="gov-btn gov-btn--secondary gov-btn--sm" to="/vendor/invitations">
+              View all
+            </Link>
+          }
+        >
+          <ul className="gov-opportunity-list">
+            {dashboard.openInvitations.map((invitation) => (
+              <li key={invitation.id} className="gov-opportunity">
+                <div className="gov-opportunity__head">
+                  <div>
+                    <Link
+                      className="gov-opportunity__title"
+                      to={`/vendor/invitations/${invitation.id}`}
+                    >
+                      {invitation.packageNumber} — {invitation.packageTitle}
+                    </Link>
+                    <p className="gov-opportunity__meta">
+                      {invitation.departmentName} · {invitation.projectTitle}
+                      {invitation.responseDeadline !== null &&
+                        ` · Respond by ${formatDate(invitation.responseDeadline)}`}
+                    </p>
+                  </div>
+                  <span className="gov-badge gov-badge--pending">Awaiting response</span>
+                </div>
+                <p className="gov-opportunity__summary">{invitation.packageDescription}</p>
+                <div className="gov-opportunity__actions">
+                  <Link
+                    className="gov-btn gov-btn--primary gov-btn--sm"
+                    to={`/vendor/invitations/${invitation.id}`}
+                  >
+                    Review and respond
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </GovernmentCard>
+      )}
 
       <div className="gov-two-column">
         <div className="gov-two-column__main">
@@ -506,7 +573,13 @@ export function VendorDashboardPage() {
                     </div>
                     <p>{notification.body}</p>
                     {notification.linkPath !== null && (
-                      <Link className="gov-link-button" to={notification.linkPath}>
+                      <Link
+                        className="gov-link-button"
+                        to={notification.linkPath}
+                        onClick={() =>
+                          void openNotification(notification.id, notification.readAt === null)
+                        }
+                      >
                         Open
                       </Link>
                     )}

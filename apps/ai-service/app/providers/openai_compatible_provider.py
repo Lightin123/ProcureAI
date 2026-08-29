@@ -38,6 +38,65 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 
+def _describe(error: openai.APIStatusError) -> str:
+    """Pulls the provider's own explanation out of an error response.
+
+    Without this a caller sees only "returned HTTP 400", which is the same
+    message for a retired model, an over-budget request, and a malformed one.
+    The provider almost always says exactly what was wrong in the body, and
+    discarding it turns a ten-second fix into a debugging session.
+    """
+    body = getattr(error, "body", None)
+
+    if isinstance(body, dict):
+        detail = body.get("message") or body.get("error")
+        if isinstance(detail, dict):
+            detail = detail.get("message")
+        if isinstance(detail, str) and detail.strip():
+            return detail.strip()
+
+    message = str(error).strip()
+    return message or "no further detail was returned"
+
+
+def _status_error(settings: Settings, error: openai.APIStatusError) -> ProviderError:
+    """Maps a provider HTTP error to a ProviderError that names the cause."""
+    detail = _describe(error)
+
+    if error.status_code == 413:
+        return ProviderError(
+            f"The request exceeded the provider's size or token budget: {detail} "
+            "On a free tier, lower AI_MAX_TOKENS."
+        )
+
+    return ProviderError(
+        f"{settings.ai_base_url} returned HTTP {error.status_code}: {detail}"
+    )
+
+
+# Providers that implement OpenAI's JSON mode require the literal word "json"
+# somewhere in the messages, or they reject the request outright. The prompts
+# happen to say "JSON" in their prose, which satisfies it today — but that makes
+# a working API call depend on a word nobody is required to keep, and the
+# failure is a 400 with no obvious connection to the prompt that was edited.
+# This states the requirement instead of relying on it.
+JSON_MODE_HINT = "Return the result as a single json object."
+
+
+def _json_mode_messages(system: str, user: str) -> list[dict[str, str]]:
+    if "json" not in system.lower() and "json" not in user.lower():
+        system = f"{system}\n\n{JSON_MODE_HINT}"
+    elif "json" not in system and "json" not in user:
+        # Present, but only in another case. Accepted by the providers tested,
+        # but the requirement is written in lower case, so make it literal.
+        system = f"{system}\n\n{JSON_MODE_HINT}"
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+
+
 class AnalysisPayload(BaseModel):
     requirements: list[SuggestedRequirement]
     clarification_questions: list[SuggestedClarification]
@@ -116,10 +175,9 @@ class OpenAICompatibleProvider:
             ],
         )
 
-        messages = [
-            {"role": "system", "content": f"{REQ_SYSTEM_PROMPT}\n\n{SCHEMA_INSTRUCTION}"},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = _json_mode_messages(
+            f"{REQ_SYSTEM_PROMPT}\n\n{SCHEMA_INSTRUCTION}", user_prompt
+        )
 
         last_error: str | None = None
 
@@ -144,9 +202,7 @@ class OpenAICompatibleProvider:
                     f"Model '{self._settings.ai_model}' is not available."
                 ) from error
             except openai.APIStatusError as error:
-                raise ProviderError(
-                    f"{self._settings.ai_base_url} returned HTTP {error.status_code}."
-                ) from error
+                raise _status_error(self._settings, error) from error
             except openai.APIConnectionError as error:
                 raise ProviderError(
                     f"Could not reach {self._settings.ai_base_url}."
@@ -189,10 +245,9 @@ class OpenAICompatibleProvider:
             confirmed_requirements=[r.model_dump() for r in request.confirmed_requirements],
         )
 
-        messages = [
-            {"role": "system", "content": f"{WP_SYSTEM_PROMPT}\n\n{WP_SCHEMA_INSTRUCTION}"},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = _json_mode_messages(
+            f"{WP_SYSTEM_PROMPT}\n\n{WP_SCHEMA_INSTRUCTION}", user_prompt
+        )
 
         last_error: str | None = None
         last_raw_response: str = ""
@@ -217,9 +272,7 @@ class OpenAICompatibleProvider:
                     "The AI provider rejected the configured API key."
                 ) from error
             except openai.APIStatusError as error:
-                raise ProviderError(
-                    f"{self._settings.ai_base_url} returned HTTP {error.status_code}."
-                ) from error
+                raise _status_error(self._settings, error) from error
             except openai.APIConnectionError as error:
                 raise ProviderError(
                     f"Could not reach {self._settings.ai_base_url}."
@@ -288,13 +341,9 @@ class OpenAICompatibleProvider:
             open_opportunity_titles=request.open_opportunity_titles,
         )
 
-        messages = [
-            {
-                "role": "system",
-                "content": f"{CAPABILITY_SYSTEM_PROMPT}\n\n{CAPABILITY_SCHEMA_INSTRUCTION}",
-            },
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = _json_mode_messages(
+            f"{CAPABILITY_SYSTEM_PROMPT}\n\n{CAPABILITY_SCHEMA_INSTRUCTION}", user_prompt
+        )
 
         last_error: str | None = None
 
@@ -315,9 +364,7 @@ class OpenAICompatibleProvider:
                     "The AI provider rejected the configured API key."
                 ) from error
             except openai.APIStatusError as error:
-                raise ProviderError(
-                    f"{self._settings.ai_base_url} returned HTTP {error.status_code}."
-                ) from error
+                raise _status_error(self._settings, error) from error
             except openai.APIConnectionError as error:
                 raise ProviderError(
                     f"Could not reach {self._settings.ai_base_url}."

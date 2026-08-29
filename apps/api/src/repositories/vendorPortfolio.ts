@@ -1,4 +1,5 @@
 import { query } from "../db/pool.js";
+import { toIsoDay } from "./dates.js";
 
 export interface VendorOffering {
   id: string;
@@ -39,10 +40,7 @@ export interface VendorCredential {
   createdAt: string;
 }
 
-function isoDate(value: Date | string | null): string | null {
-  if (value === null) return null;
-  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
-}
+const isoDate = toIsoDay;
 
 function numeric(value: string | null): number | null {
   if (value === null) return null;

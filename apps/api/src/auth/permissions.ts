@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   "workpackage:manage",
   "vendor:matching:read",
   "vendor:shortlist:manage",
+  "vendor:invitation:manage",
   "organization:read",
   "system:status:read",
   "user:read",
@@ -30,6 +31,8 @@ export const PERMISSIONS = [
   "vendor:profile:manage",
   "vendor:opportunity:read",
   "vendor:opportunity:engage",
+  "vendor:invitation:read",
+  "vendor:invitation:respond",
   "vendor:registry:read",
   "vendor:verification:manage",
   "opportunity:publish",
@@ -60,6 +63,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "workpackage:manage",
     "vendor:matching:read",
     "vendor:shortlist:manage",
+    "vendor:invitation:manage",
     "organization:read",
     "system:status:read",
     "opportunity:publish",
@@ -85,6 +89,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "vendor:profile:manage",
     "vendor:opportunity:read",
     "vendor:opportunity:engage",
+    // A supplier's invitations are their own. The permission is held by no
+    // government or oversight role, so the vendor-facing invitation routes
+    // cannot be reached by the side that issued the invitation.
+    "vendor:invitation:read",
+    "vendor:invitation:respond",
   ],
 };
 

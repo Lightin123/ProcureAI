@@ -2848,3 +2848,141 @@ a:hover {
 }
 
 
+
+/* ==========================================================================
+   Supplier notification bell
+   --------------------------------------------------------------------------
+   Sits in the institutional header beside the session box, so an invitation
+   reaches the supplier on whichever page they are on. Rendered for supplier
+   accounts only.
+   ========================================================================== */
+
+.gov-bell {
+  position: relative;
+  margin-right: 4px;
+}
+
+.gov-bell__button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--gov-border);
+  border-radius: var(--gov-radius);
+  background: var(--gov-bg-surface);
+  color: var(--gov-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.gov-bell__button:hover {
+  background: var(--gov-bg-alt);
+  color: var(--gov-primary-dark);
+}
+
+.gov-bell__count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--gov-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.gov-bell__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--gov-bg-surface);
+  border: 1px solid var(--gov-border-strong);
+  border-radius: var(--gov-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.gov-bell__panel-head,
+.gov-bell__panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.gov-bell__panel-head {
+  border-bottom: 1px solid var(--gov-border);
+}
+
+.gov-bell__panel-foot {
+  border-top: 1px solid var(--gov-border);
+}
+
+.gov-bell__empty {
+  margin: 0;
+  padding: 18px 14px;
+  font-size: 13px;
+  color: var(--gov-text-muted);
+}
+
+.gov-bell__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.gov-bell__item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--gov-border);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gov-bell__item:hover {
+  background: var(--gov-bg-alt);
+}
+
+.gov-bell__item--unread {
+  border-left: 3px solid var(--gov-primary);
+  background: var(--gov-bg-alt);
+}
+
+.gov-bell__item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--gov-text-primary);
+}
+
+.gov-bell__item-head span {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--gov-text-muted);
+}
+
+.gov-bell__item-body {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gov-text-secondary);
+}

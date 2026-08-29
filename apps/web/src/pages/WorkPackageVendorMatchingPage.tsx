@@ -5,9 +5,13 @@ import { ApiRequestError } from "../api/client.js";
 import {
   getVendorMatchDetail,
   getVendorMatches,
+  inviteVendor,
   removeShortlistedVendor,
   runVendorMatching,
   shortlistVendor,
+  withdrawInvitation,
+  type InvitationStatus,
+  type ShortlistEntry,
   type VendorMatchDetail,
   type VendorMatchView,
   type VendorRecommendation,
@@ -18,11 +22,14 @@ import { GovernmentCard } from "../components/GovernmentCard.js";
 import {
   AlertCircleIcon,
   BuildingIcon,
+  MailIcon,
   PackageIcon,
   SparklesIcon,
 } from "../components/GovernmentIcons.js";
+import { InviteVendorModal, type InvitePayload } from "../components/InviteVendorModal.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProjectSectionNav } from "../components/ProjectSectionNav.js";
+import { ShortlistReasonModal } from "../components/ShortlistReasonModal.js";
 import { VendorComparisonModal } from "../components/VendorComparisonModal.js";
 import { VendorMatchCard } from "../components/VendorMatchCard.js";
 import { VendorMatchDetailModal } from "../components/VendorMatchDetailModal.js";
@@ -47,6 +54,33 @@ function formatInr(amount: number | null): string {
 
 const MAX_COMPARISON = 4;
 
+const INVITATION_BADGE: Record<InvitationStatus, { label: string; className: string }> = {
+  INVITED: { label: "Awaiting response", className: "gov-badge gov-badge--pending" },
+  ACCEPTED: { label: "Accepted", className: "gov-badge gov-badge--operational" },
+  DECLINED: { label: "Declined", className: "gov-badge gov-badge--cancelled" },
+  WITHDRAWN: { label: "Withdrawn", className: "gov-badge gov-badge--inactive" },
+};
+
+function formatMoment(value: string | null): string {
+  if (value === null) return "—";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDay(value: string | null): string {
+  if (value === null) return "—";
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function WorkPackageVendorMatchingPage() {
   const { id, workPackageId } = useParams<{ id: string; workPackageId: string }>();
   const projectId = id ?? "";
@@ -66,6 +100,9 @@ export function WorkPackageVendorMatchingPage() {
   const [detail, setDetail] = React.useState<VendorMatchDetail>();
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
+
+  const [shortlisting, setShortlisting] = React.useState<VendorRecommendation>();
+  const [inviting, setInviting] = React.useState<ShortlistEntry>();
 
   const load = React.useCallback(
     async (signal?: AbortSignal) => {
@@ -137,7 +174,12 @@ export function WorkPackageVendorMatchingPage() {
   const recommendations = view?.recommendations ?? [];
   const excluded = view?.excluded ?? [];
   const shortlist = view?.shortlist ?? [];
+  const invitations = view?.invitations ?? [];
   const shortlisted = new Set(shortlist.map((entry) => entry.vendorProfileId));
+  const packageLabel =
+    view?.workPackage === undefined
+      ? "this work package"
+      : `${view.workPackage.packageNumber} — ${view.workPackage.title}`;
 
   const isConfirmed = workPackage?.status === "CONFIRMED";
   const mandatory = view?.matchingRequirements?.mandatoryCertifications ?? [];
@@ -175,21 +217,43 @@ export function WorkPackageVendorMatchingPage() {
     });
   }
 
-  function handleShortlist(recommendation: VendorRecommendation): void {
+  function confirmShortlist(reason: string): void {
+    const recommendation = shortlisting;
+    if (recommendation === undefined) return;
+
+    setShortlisting(undefined);
+    void perform(
+      () => shortlistVendor(packageId, recommendation.vendor.vendorProfileId, reason),
+      "The supplier has been added to the shortlist for this work package.",
+    );
+  }
+
+  function confirmInvitation(payload: InvitePayload): void {
+    const entry = inviting;
+    if (entry === undefined) return;
+
+    setInviting(undefined);
+    void perform(
+      () =>
+        inviteVendor(packageId, {
+          vendorProfileId: entry.vendorProfileId,
+          message: payload.message,
+          responseDeadline: payload.responseDeadline,
+        }),
+      `${entry.legalName ?? entry.organizationName} has been invited and notified in the supplier portal.`,
+    );
+  }
+
+  function handleWithdraw(invitationId: string, supplierName: string): void {
     const reason = window.prompt(
-      `State why ${recommendation.vendor.legalName ?? recommendation.vendor.organizationName} is being shortlisted for this work package.`,
+      `State why the invitation to ${supplierName} is being withdrawn. The supplier is told.`,
       "",
     );
     if (reason === null) return;
 
     void perform(
-      () =>
-        shortlistVendor(
-          packageId,
-          recommendation.vendor.vendorProfileId,
-          reason.trim() === "" ? null : reason.trim(),
-        ),
-      "The supplier has been added to the shortlist for this work package.",
+      () => withdrawInvitation(packageId, invitationId, reason.trim() === "" ? null : reason.trim()),
+      "The invitation has been withdrawn and the supplier has been notified.",
     );
   }
 
@@ -439,35 +503,202 @@ export function WorkPackageVendorMatchingPage() {
           {shortlist.length > 0 && (
             <GovernmentCard
               title={`Shortlist for this work package (${shortlist.length})`}
-              subtitle="Suppliers the department has marked for the next stage"
+              subtitle="Suppliers the department has marked for engagement, and whether each has been invited"
+            >
+              <div className="gov-table-container">
+                <table className="gov-table">
+                  <caption className="gov-table-caption">
+                    This shortlist belongs to {workPackage.packageNumber} alone. Shortlisting a
+                    supplier here does not shortlist them for any other work package in the
+                    project.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Supplier</th>
+                      <th scope="col" style={{ width: "70px" }}>
+                        Rank
+                      </th>
+                      <th scope="col" style={{ width: "70px" }}>
+                        Score
+                      </th>
+                      <th scope="col">Reason recorded</th>
+                      <th scope="col" style={{ width: "150px" }}>
+                        Added by
+                      </th>
+                      <th scope="col" style={{ width: "150px" }}>
+                        Engagement
+                      </th>
+                      <th scope="col" style={{ width: "180px" }}>
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shortlist.map((entry) => {
+                      const badge =
+                        entry.invitationStatus === null
+                          ? undefined
+                          : INVITATION_BADGE[entry.invitationStatus];
+                      const live =
+                        entry.invitationStatus === "INVITED" ||
+                        entry.invitationStatus === "ACCEPTED";
+
+                      return (
+                        <tr key={entry.id}>
+                          <td>{entry.legalName ?? entry.organizationName}</td>
+                          <td>{entry.rankAtShortlist ?? "—"}</td>
+                          <td>{entry.scoreAtShortlist ?? "—"}</td>
+                          <td>{entry.reason ?? "—"}</td>
+                          <td>
+                            {entry.addedByName}
+                            <div style={{ fontSize: "11px", color: "var(--gov-text-muted)" }}>
+                              {formatMoment(entry.createdAt)}
+                            </div>
+                          </td>
+                          <td>
+                            {badge === undefined ? (
+                              <span style={{ color: "var(--gov-text-muted)", fontSize: "12px" }}>
+                                Not yet invited
+                              </span>
+                            ) : (
+                              <span className={badge.className}>{badge.label}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {!live && (
+                                <button
+                                  type="button"
+                                  className="gov-btn gov-btn--primary gov-btn--sm"
+                                  disabled={busy || !isConfirmed}
+                                  onClick={() => setInviting(entry)}
+                                  title={
+                                    entry.invitationStatus === null
+                                      ? "Invite this supplier to respond to this work package"
+                                      : "Issue a fresh invitation to this supplier"
+                                  }
+                                >
+                                  {entry.invitationStatus === null ? "Invite" : "Invite again"}
+                                </button>
+                              )}
+
+                              {entry.invitationStatus === "INVITED" &&
+                                entry.invitationId !== null && (
+                                  <button
+                                    type="button"
+                                    className="gov-btn gov-btn--tertiary gov-btn--sm"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      handleWithdraw(
+                                        entry.invitationId as string,
+                                        entry.legalName ?? entry.organizationName,
+                                      )
+                                    }
+                                  >
+                                    Withdraw
+                                  </button>
+                                )}
+
+                              {!live && (
+                                <button
+                                  type="button"
+                                  className="gov-btn gov-btn--tertiary gov-btn--sm"
+                                  style={{ color: "var(--gov-danger)" }}
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void perform(
+                                      () =>
+                                        removeShortlistedVendor(packageId, entry.vendorProfileId),
+                                      "The supplier has been removed from the shortlist.",
+                                    )
+                                  }
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </GovernmentCard>
+          )}
+
+          {/* ---- Invitation tracking ------------------------------------- */}
+          {invitations.length > 0 && (
+            <GovernmentCard
+              title={
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <MailIcon size={18} />
+                  <span>Invitations issued ({invitations.length})</span>
+                </div>
+              }
+              subtitle="Every invitation on this work package, and how each supplier answered"
             >
               <div className="gov-table-container">
                 <table className="gov-table">
                   <thead>
                     <tr>
                       <th scope="col">Supplier</th>
-                      <th scope="col" style={{ width: "90px" }}>
-                        Rank
+                      <th scope="col" style={{ width: "150px" }}>
+                        Status
                       </th>
-                      <th scope="col" style={{ width: "90px" }}>
-                        Score
+                      <th scope="col" style={{ width: "170px" }}>
+                        Invited
                       </th>
-                      <th scope="col">Reason recorded</th>
-                      <th scope="col" style={{ width: "160px" }}>
-                        Added by
+                      <th scope="col" style={{ width: "130px" }}>
+                        Response due
                       </th>
+                      <th scope="col" style={{ width: "170px" }}>
+                        Responded
+                      </th>
+                      <th scope="col">Supplier&rsquo;s note</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {shortlist.map((entry) => (
-                      <tr key={entry.id}>
-                        <td>{entry.legalName ?? entry.organizationName}</td>
-                        <td>{entry.rankAtShortlist ?? "—"}</td>
-                        <td>{entry.scoreAtShortlist ?? "—"}</td>
-                        <td>{entry.reason ?? "—"}</td>
-                        <td>{entry.addedByName}</td>
-                      </tr>
-                    ))}
+                    {invitations.map((invitation) => {
+                      const badge = INVITATION_BADGE[invitation.status];
+
+                      return (
+                        <tr key={invitation.id}>
+                          <td>{invitation.legalName ?? invitation.organizationName}</td>
+                          <td>
+                            <span className={badge.className}>{badge.label}</span>
+                          </td>
+                          <td>
+                            {formatMoment(invitation.invitedAt)}
+                            <div style={{ fontSize: "11px", color: "var(--gov-text-muted)" }}>
+                              by {invitation.invitedByName}
+                            </div>
+                          </td>
+                          <td>{formatDay(invitation.responseDeadline)}</td>
+                          <td>
+                            {invitation.respondedAt === null ? (
+                              <span style={{ color: "var(--gov-text-muted)" }}>—</span>
+                            ) : (
+                              <>
+                                {formatMoment(invitation.respondedAt)}
+                                <div style={{ fontSize: "11px", color: "var(--gov-text-muted)" }}>
+                                  by {invitation.respondedByName ?? "the supplier"}
+                                </div>
+                              </>
+                            )}
+                          </td>
+                          <td style={{ fontSize: "13px" }}>
+                            {invitation.status === "WITHDRAWN"
+                              ? `Withdrawn by ${invitation.withdrawnByName ?? "the department"}${
+                                  invitation.withdrawalReason === null
+                                    ? "."
+                                    : `: ${invitation.withdrawalReason}`
+                                }`
+                              : (invitation.responseNote ?? "—")}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -535,7 +766,7 @@ export function WorkPackageVendorMatchingPage() {
                     busy={busy}
                     onToggleSelect={toggleSelect}
                     onView={(vendorProfileId) => void openVendor(vendorProfileId)}
-                    onShortlist={handleShortlist}
+                    onShortlist={setShortlisting}
                     onRemoveShortlist={(vendorProfileId) =>
                       void perform(
                         () => removeShortlistedVendor(packageId, vendorProfileId),
@@ -579,7 +810,7 @@ export function WorkPackageVendorMatchingPage() {
                       busy={busy}
                       onToggleSelect={toggleSelect}
                       onView={(vendorProfileId) => void openVendor(vendorProfileId)}
-                      onShortlist={handleShortlist}
+                      onShortlist={setShortlisting}
                       onRemoveShortlist={() => undefined}
                     />
                   ))}
@@ -606,6 +837,22 @@ export function WorkPackageVendorMatchingPage() {
         detail={detail}
         loading={detailLoading}
         onClose={() => setDetailOpen(false)}
+      />
+
+      <ShortlistReasonModal
+        recommendation={shortlisting}
+        packageLabel={packageLabel}
+        busy={busy}
+        onConfirm={confirmShortlist}
+        onCancel={() => setShortlisting(undefined)}
+      />
+
+      <InviteVendorModal
+        entry={inviting}
+        packageLabel={packageLabel}
+        busy={busy}
+        onConfirm={confirmInvitation}
+        onCancel={() => setInviting(undefined)}
       />
     </>
   );

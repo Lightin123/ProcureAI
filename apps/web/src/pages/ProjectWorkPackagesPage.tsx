@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { ApiRequestError } from "../api/client.js";
 import {
@@ -59,6 +59,7 @@ import { WorkPackageSplitModal } from "../components/WorkPackageSplitModal.js";
 export function ProjectWorkPackagesPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
+  const navigate = useNavigate();
 
   const [view, setView] = useState<WorkPackagesView | undefined>(undefined);
   const [requirements, setRequirements] = useState<ProjectRequirement[]>([]);
@@ -635,6 +636,9 @@ export function ProjectWorkPackagesPage() {
                     busy={busy}
                     isSelected={selectedIds.includes(pkg.id)}
                     onSelect={handleSelect}
+                    onFindSuppliers={(id) =>
+                      navigate(`/projects/${projectId}/work-packages/${id}/suppliers`)
+                    }
                     onAccept={(id) =>
                       void perform(
                         () => acceptWorkPackage(id),

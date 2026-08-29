@@ -140,8 +140,26 @@ class CapabilityInsightsResponse(BaseModel):
     prompt_version: str
 
 
+# --- Embedding Schemas ---
+
+class EmbeddingRequest(BaseModel):
+    # Batched rather than one call per text: re-embedding the supplier registry
+    # is a routine operation and a request per profile would make it a slow one.
+    texts: list[str] = Field(min_length=1, max_length=64)
+
+
+class EmbeddingResponse(BaseModel):
+    embeddings: list[list[float]]
+    model: str
+    provider: str
+    dimensions: int
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     service: Literal["procureai-ai-service"]
     provider: str
     model: str | None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
+    embedding_dimensions: int | None = None

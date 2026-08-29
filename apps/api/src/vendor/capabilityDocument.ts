@@ -55,6 +55,12 @@ export interface CapabilitySources {
 export interface CapabilityDocument {
   document: string;
   keywords: string[];
+  /**
+   * What the embedding model reads. See `buildSemanticDocument` — this is the
+   * capability-bearing prose alone, without the registration and contact
+   * boilerplate that every supplier's record carries.
+   */
+  semanticDocument: string;
 }
 
 /**
@@ -447,5 +453,85 @@ export function buildCapabilityDocument(
   return {
     document: sections.join("\n\n"),
     keywords: [...keywords].sort(),
+    semanticDocument: buildSemanticDocument(values, sources),
   };
+}
+
+/**
+ * The capability-bearing prose alone, for the embedding model.
+ *
+ * A sentence encoder reads a fixed window and averages what it finds, so every
+ * sentence in the text competes for the same vector. The full capability
+ * document is mostly registration, address, contact, entity type, delivery
+ * models and value bands — true, useful for the eligibility gate, and near
+ * identical across suppliers. Embedding it pulls every supplier towards the
+ * same point: measured on the seeded registry, unrelated packages and
+ * suppliers sat at 0.75 cosine and a road contractor out-scored a farmer
+ * producer company on a vegetable supply package.
+ *
+ * So what is embedded is only the text that says what the organisation can
+ * actually do. The omitted fields are not lost — they are structured data the
+ * eligibility gate and the ranking dimensions read directly, which is a better
+ * use of them than blurring them into a vector.
+ */
+function buildSemanticDocument(values: ProfileValues, sources: CapabilitySources): string {
+  const parts: string[] = [];
+
+  const add = (value: string | undefined): void => {
+    if (value !== undefined && value.trim() !== "") parts.push(value.trim());
+  };
+
+  add(stringOf(values, "headline"));
+  add(stringOf(values, "capabilitySummary"));
+  add(stringOf(values, "problemBeingSolved"));
+  add(stringOf(values, "valueProposition"));
+  add(stringOf(values, "differentiators"));
+
+  for (const path of [
+    "coreCapabilities",
+    "expertiseAreas",
+    "problemDomains",
+    "sectorsServed",
+    "subDomains",
+  ]) {
+    const value = getByPath(values, path);
+    if (Array.isArray(value)) add(joinList(value as string[]));
+  }
+
+  add(joinList(labelList(getByPath(values, "industries"))));
+
+  for (const offering of sources.offerings) {
+    add(
+      [
+        offering.name,
+        offering.description ?? "",
+        offering.categories.join(", "),
+        offering.tags.join(", "),
+      ]
+        .filter((line) => line.trim() !== "")
+        .join(". "),
+    );
+  }
+
+  // Past work says what a supplier has actually delivered, which is exactly
+  // the kind of evidence document-level similarity should be reading.
+  for (const item of sources.experience) {
+    add(
+      [item.title, item.sector ?? "", item.description ?? "", item.outcome ?? ""]
+        .filter((line) => line.trim() !== "")
+        .join(". "),
+    );
+  }
+
+  // The industry-specific answers carry the most concrete domain vocabulary a
+  // profile holds — production capacity, crops handled, deployment regions.
+  const dynamic = getByPath(values, "dynamicAnswers");
+  if (typeof dynamic === "object" && dynamic !== null) {
+    for (const value of Object.values(dynamic as Record<string, unknown>)) {
+      if (typeof value === "string") add(value);
+      else if (Array.isArray(value)) add(joinList(value.filter((v): v is string => typeof v === "string")));
+    }
+  }
+
+  return parts.join("\n");
 }

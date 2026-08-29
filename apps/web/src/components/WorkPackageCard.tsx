@@ -2,6 +2,7 @@ import React from "react";
 import type { WorkPackageItem } from "../api/workPackages.js";
 import { StatusBadge } from "./StatusBadge.js";
 import {
+  BuildingIcon,
   CheckIcon,
   CloseIcon,
   CopyIcon,
@@ -27,6 +28,7 @@ interface WorkPackageCardProps {
   onDelete: (id: string) => void;
   onRestore: (id: string) => void;
   onViewHistory: (pkg: WorkPackageItem) => void;
+  onFindSuppliers?: (id: string) => void;
 }
 
 function statusTone(status: string) {
@@ -105,6 +107,7 @@ export function WorkPackageCard({
   onDelete,
   onRestore,
   onViewHistory,
+  onFindSuppliers,
 }: WorkPackageCardProps) {
   const pStyle = priorityColor(pkg.priority || "MEDIUM");
   const deliverables = pkg.deliverables || [];
@@ -329,6 +332,23 @@ export function WorkPackageCard({
       {/* Action Toolbar */}
       <div className="gov-wp-card__footer">
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+          {/* Supplier matching is offered only once the package is confirmed,
+              which is the same gate the API enforces. Offering it earlier would
+              put suppliers in front of an official against requirements the
+              department has not yet agreed. */}
+          {!pkg.isDeleted && pkg.status === "CONFIRMED" && onFindSuppliers !== undefined && (
+            <button
+              type="button"
+              className="gov-btn gov-btn--primary gov-btn--sm"
+              disabled={busy}
+              onClick={() => onFindSuppliers(pkg.id)}
+              title="Find eligible suppliers ranked against this work package"
+            >
+              <BuildingIcon size={14} />
+              Find Suitable Vendors
+            </button>
+          )}
+
           {!pkg.isDeleted ? (
             <>
               {canEdit && pkg.status !== "ACCEPTED" && pkg.status !== "CONFIRMED" && (

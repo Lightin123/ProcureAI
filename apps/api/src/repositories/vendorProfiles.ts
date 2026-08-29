@@ -73,6 +73,7 @@ export interface VendorProfile {
   lastSection: string | null;
 
   capabilityDocument: string | null;
+  semanticDocument: string | null;
   capabilityKeywords: string[];
   aiInsights: unknown;
   aiInsightsAt: string | null;
@@ -217,6 +218,7 @@ interface ProfileRow {
   completed_sections: string[];
   last_section: string | null;
   capability_document: string | null;
+  semantic_document: string | null;
   capability_keywords: string[];
   ai_insights: unknown;
   ai_insights_at: Date | null;
@@ -246,7 +248,7 @@ const SELECT_PROFILE = `
          p.innovation_description, p.deployment_readiness, p.measurable_impact,
          p.has_intellectual_property, p.intellectual_property_details,
          p.dynamic_answers, p.completion_percentage, p.completed_sections, p.last_section,
-         p.capability_document, p.capability_keywords,
+         p.capability_document, p.semantic_document, p.capability_keywords,
          p.ai_insights, p.ai_insights_at, p.ai_insights_model,
          p.submitted_at, p.verified_at, p.verification_notes, p.created_at, p.updated_at
   FROM vendor_profiles p
@@ -325,6 +327,7 @@ function toProfile(row: ProfileRow): VendorProfile {
     completedSections: row.completed_sections,
     lastSection: row.last_section,
     capabilityDocument: row.capability_document,
+    semanticDocument: row.semantic_document,
     capabilityKeywords: row.capability_keywords,
     aiInsights: row.ai_insights,
     aiInsightsAt: row.ai_insights_at?.toISOString() ?? null,
@@ -423,6 +426,7 @@ export async function updateDerivedProfileState(
     completionPercentage: number;
     completedSections: string[];
     capabilityDocument: string;
+    semanticDocument: string;
     capabilityKeywords: string[];
     lastSection?: string | undefined;
   },
@@ -433,8 +437,9 @@ export async function updateDerivedProfileState(
          completed_sections     = $3,
          capability_document    = $4,
          capability_keywords    = $5,
+         semantic_document      = $6,
          capability_document_at = now(),
-         last_section           = COALESCE($6, last_section),
+         last_section           = COALESCE($7, last_section),
          updated_at             = now()
      WHERE id = $1`,
     [
@@ -443,6 +448,7 @@ export async function updateDerivedProfileState(
       input.completedSections,
       input.capabilityDocument,
       input.capabilityKeywords,
+      input.semanticDocument,
       input.lastSection ?? null,
     ],
   );

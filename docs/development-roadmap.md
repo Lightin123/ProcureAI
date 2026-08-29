@@ -1,10 +1,12 @@
 # Development Roadmap
 
-**Status:** Milestones 0 through 5 are complete. Milestone 6 (Vendor
-Ecosystem) is in progress: vendor onboarding, profiles, verification, the
-vendor portal, and opportunity-level matching are implemented; work-package-
-level hybrid matching is the current development priority. Milestones 7
-onward are planned sequencing only.
+**Status:** Milestones 0 through 6 are complete. Milestone 6 (Vendor
+Ecosystem) delivered vendor onboarding, profiles, verification, the vendor
+portal, opportunity-level matching, and — in its second half — work-package-
+level hybrid matching with deterministic eligibility, pgvector semantic
+retrieval, multi-factor ranking, explainable recommendations, side-by-side
+comparison, and a minimal shortlist seam. Milestones 7 onward are planned
+sequencing only.
 
 ## Milestone 0 — Documentation Foundation (Complete)
 
@@ -106,15 +108,15 @@ FR10, and FR11.1. Migration `004_authentication.sql`. See
 [engineering/security.md](engineering/security.md) and
 [product/users-and-roles.md](product/users-and-roles.md).
 
-## Milestone 6 — Vendor Ecosystem (In Progress)
+## Milestone 6 — Vendor Ecosystem (Complete)
 
 Goal, in full: take a vendor from public registration through a verified,
 matchable capability profile, and match that profile against government
-procurement opportunities. The milestone is being delivered in two halves —
-**vendor onboarding and opportunity-level matching are built**; **work-
-package-level hybrid matching is the active development priority.**
+procurement work packages. Delivered in two halves — **vendor onboarding and
+opportunity-level matching**, then **work-package-level hybrid matching**.
+Both are built.
 
-### Completed
+### Completed — first half (vendor onboarding and the vendor portal)
 
 - [x] Public vendor self-registration (`POST /api/v1/auth/register`) —
       creates a `VENDOR` account, never a government or admin account.
@@ -136,7 +138,7 @@ package-level hybrid matching is the active development priority.**
       — D60) and a supplier registry.
 - [x] A derived **capability document** (natural-language) and
       **capability keyword set**, rebuilt on every profile write — the
-      artifact the next phase's embeddings will consume (see
+      artifact the second half's embeddings consume (see
       [ai/vendor-discovery.md](ai/vendor-discovery.md)).
 - [x] Government-side opportunity publication: an official explicitly
       publishes a confirmed project, choosing what summary and which
@@ -156,88 +158,123 @@ package-level hybrid matching is the active development priority.**
 - [x] AI-generated capability insights (advisory only — never read back by
       matching, verification, or eligibility).
 
-Migration `005_vendor_profiles.sql`. Delivers a vendor-facing precursor to
-FR4, not FR4 itself: FR4 is specified at work-package granularity with
-semantic search, and the current matching is project-level and lexical.
+Migration `005_vendor_profiles.sql`. This half delivered a vendor-facing
+precursor to FR4 rather than FR4 itself: FR4 is specified at work-package
+granularity with semantic search, and this matching is project-level and
+lexical. It remains in place — it is what a *vendor* sees in their portal.
 
-### Remaining (Current Priority — see "Next Phase" below)
+### Completed — second half (work package to vendor matching)
 
-- [ ] Work-package-level matching (matching a specific work package, not
-      the whole project, against vendors).
-- [ ] Deterministic eligibility filtering as a distinct pre-ranking gate.
-- [ ] pgvector integration and vendor/requirement embeddings.
-- [ ] Semantic candidate retrieval.
-- [ ] Hybrid (lexical + semantic) matching, replacing lexical-only.
-- [ ] Vendor ranking per work package with individually-inspectable
-      dimensions.
-- [ ] Explainable, package-level recommendations.
-- [ ] Government-side vendor comparison and shortlisting UI.
-- [ ] Vendor invitation workflow.
-- [ ] Vendor gap analysis.
-
----
-
-## Next Phase — Work Package to Vendor Matching (Immediate Priority)
-
-The system currently answers *"which published opportunities look relevant
-to this vendor"* — project-level, lexical, and the same question regardless
-of which work package within the project a vendor might actually be suited
-to. The next phase answers the question the product is actually meant to
-answer: *"for this specific confirmed work package, which eligible vendors
-are the best fit, ranked and explained."*
-
-```
-Vendor <-> Procurement Project / Opportunity Matching        (current)
-                            |
-                            v
-Work Package <-> Eligible Vendors <-> Ranked Recommendations (next)
-```
-
-Full design lives in [ai/vendor-discovery.md](ai/vendor-discovery.md) (the
-matching pipeline) and [ai/evaluation-and-ranking.md](ai/evaluation-and-ranking.md)
-(ranking and explainability). Summary of the planned pipeline:
+The first half answered *"which published opportunities look relevant to this
+vendor"* — project-level, lexical, and the same answer regardless of which
+work package within a project a vendor is actually suited to. This half
+answers the question the product exists to answer: *"for this specific
+confirmed work package, which eligible vendors are the best fit, ranked and
+explained."*
 
 ```
 CONFIRMED WORK PACKAGE
         |
         v
-Requirement Normalization
+Requirement Normalization            normalization.ts
         |
         v
-Structured Eligibility Filtering
-        |
-        v
-Hybrid Candidate Retrieval
+Hybrid Candidate Retrieval           retrieval.ts
    +---------------+----------------+
    v                                v
-Lexical Search                Semantic Search
+Lexical Search                Semantic Search (pgvector / HNSW)
    |                                |
    +---------------+----------------+
                     v
-              Candidate Pool
+        Deduplicated Candidate Pool
                     |
                     v
-          Multi-Factor Ranking
+     Deterministic Eligibility Gate  eligibility.ts    (hard gate, not a score)
+                    |
+                    v
+          Multi-Factor Ranking       ranking.ts        (deterministic, 7 dims)
                     |
                     v
        Explainable Recommendations
                     |
                     v
-       Government Human Review
+       Government Human Review       the official decides
 ```
 
-Everything from "Government Human Review" downward (shortlisting,
-invitation, response collection, evaluation, final decision) is described
-in the milestones below and is **not** part of this immediate priority — it
-depends on this matching layer existing first.
+- [x] **Work-package-level matching.** A project's packages are matched
+      independently and produce different rankings — verified in the seeded
+      demonstration project, where four confirmed packages in one project
+      each recommend a different supplier.
+- [x] **Deterministic eligibility as a distinct pre-ranking gate** (D63):
+      profile assessability, verification state, mandatory certifications,
+      credential validity, delivery region, and contract-value ceiling. Each
+      check reports the requirement it enforces and the evidence it was
+      judged on. A dimension the package does not constrain produces no
+      check at all. A supplier who fails is excluded, never merely ranked
+      lower.
+- [x] **pgvector integration** (migrations `006_work_package_matching.sql`
+      and `007_semantic_embeddings.sql`), with vendor capability embeddings
+      and work-package embeddings stored in 384-dimension vector columns
+      behind an HNSW cosine index (D65). pgvector is optional: without it,
+      matching degrades to lexical-only with a visible warning (D64).
+- [x] **Embedding service boundary** in the AI service
+      (`POST /internal/v1/embeddings`), configured independently of the
+      analysis provider (D66). The default is `BAAI/bge-small-en-v1.5`, a real
+      sentence encoder running locally on CPU with no API key (D70); the
+      deterministic concept model is the offline fallback, and hosted
+      embeddings are opt-in.
+- [x] **Semantic documents** (D71): what gets embedded is the
+      capability-bearing prose alone, on both sides. Measured on the seeded
+      registry, this moved the intended supplier from top-1 on three of four
+      packages to top-1 on all four, and widened the gap between an intended
+      match and an unrelated one.
+- [x] **Per-model similarity calibration** (D72): retrieval threshold and
+      score scale are measured per embedding model, because cosine is not
+      comparable between them.
+- [x] **Semantic candidate retrieval** over stored embeddings, with a
+      minimum similarity threshold so "found semantically" means genuinely
+      close rather than merely closest.
+- [x] **Hybrid retrieval**: lexical and semantic run independently and are
+      unioned and deduplicated; each candidate records which halves found it,
+      so a supplier a keyword search could not have surfaced is visible as
+      such in the portal.
+- [x] **Multi-factor ranking** with seven individually-inspectable
+      dimensions — capability fit (25), semantic relevance (20), relevant
+      experience (18), capacity and delivery (12), geographic fit (10),
+      compliance and credentials (9), verification and credibility (6).
+      Fully deterministic; no model decides a score or a position.
+- [x] **Explainable recommendations**: per-dimension scores with their
+      reasoning, matched and missing capability terms, relevant past
+      projects, credentials, strengths, gaps, and a written summary — every
+      line derived from a stored value, never authored by a model.
+- [x] **Government matching UI** at
+      `projects/:id/work-packages/:workPackageId/suppliers`, reached from a
+      "Find Suitable Vendors" action shown only on confirmed packages.
+      Includes the ranked list, an inspectable excluded-suppliers section,
+      a supplier detail view scoped to the package, and side-by-side
+      comparison of up to four suppliers.
+- [x] **Provenance**: every run stores its strategy, normalization,
+      eligibility and ranking versions, its weights, its embedding model, and
+      its per-supplier results — including the suppliers it excluded and why
+      (D68).
+- [x] **Shortlist seam** for Milestone 7 (D69): a minimal
+      `work_package_shortlist` table with add/remove endpoints, the rank and
+      score read server-side from the stored run rather than accepted from
+      the browser. Invitation and everything downstream is *not* built.
+
+Migration `006_work_package_matching.sql`. Delivers FR4.1, FR4.2 and FR4.3.
+
+Not built in this milestone, and deliberately deferred: vendor invitation and
+the engagement workflow around the shortlist (Milestone 7), and vendor gap
+analysis (Milestone 10).
 
 ## Milestone 7 — Vendor Shortlisting and Engagement (Planned, Not Detailed)
 
 Goal: let an official act on ranked recommendations rather than only view
 them.
 
-- View ranked, explained vendors per work package (built on Milestone 6's
-  next phase).
+- View ranked, explained vendors per work package (**built** in Milestone
+  6's second half).
 - Compare vendors side by side; inspect a vendor's full profile and match
   explanation from within the comparison.
 - Build and maintain a shortlist per work package: add, remove, and record
@@ -247,7 +284,7 @@ them.
   it is not itself a commitment.
 - AI recommends; the official decides. No automatic vendor selection.
 
-Depends on Milestone 6's next phase (work-package-level ranked
+Depends on Milestone 6's second half (work-package-level ranked
 recommendations) existing to act on.
 
 ## Milestone 8 — Vendor Response and Proposal Collection (Planned, Not Detailed)
@@ -287,7 +324,7 @@ for a human decision.
   evaluation** applies defined scoring criteria; **the human makes the final
   procurement decision.** AI never independently determines eligibility or
   overrides deterministic scoring — the same trust principle established for
-  matching in Milestone 6's next phase.
+  matching in Milestone 6's second half.
 
 Delivers FR5, FR6, FR7, FR8, and FR9.2 (final decision recording).
 
@@ -311,7 +348,7 @@ phase, not a near-term priority.
 ## Milestone 11 — Advanced Semantic Optimization (Planned, Not Detailed)
 
 Goal: improve matching quality after a reliable hybrid baseline (Milestone
-6's next phase) is in production, not before.
+6's second half) is in production, not before.
 
 - Domain-specific embeddings, procurement vocabulary normalization,
   synonym expansion, industry taxonomies.

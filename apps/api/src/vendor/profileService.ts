@@ -132,6 +132,7 @@ export async function refreshDerivedState(
     completedSections: completedSectionIds(full.completion),
     capabilityDocument: capability.document,
     capabilityKeywords: capability.keywords,
+    semanticDocument: capability.semanticDocument,
     lastSection,
   });
 

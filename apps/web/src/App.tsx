@@ -17,6 +17,8 @@ import { ProjectRequirementsPage } from "./pages/ProjectRequirementsPage.js";
 import { ProjectWorkPackagesPage } from "./pages/ProjectWorkPackagesPage.js";
 import { SystemStatusPage } from "./pages/SystemStatusPage.js";
 import { VendorDashboardPage } from "./pages/VendorDashboardPage.js";
+import { VendorInvitationDetailPage } from "./pages/VendorInvitationDetailPage.js";
+import { VendorInvitationsPage } from "./pages/VendorInvitationsPage.js";
 import { VendorOnboardingPage } from "./pages/VendorOnboardingPage.js";
 import { VendorOpportunitiesPage } from "./pages/VendorOpportunitiesPage.js";
 import { VendorOpportunityDetailPage } from "./pages/VendorOpportunityDetailPage.js";
@@ -74,6 +76,11 @@ export function App() {
           <Route element={<RequirePermission permission={ROUTE_PERMISSION.vendorOpportunities} />}>
             <Route path="vendor/opportunities" element={<VendorOpportunitiesPage />} />
             <Route path="vendor/opportunities/:id" element={<VendorOpportunityDetailPage />} />
+          </Route>
+
+          <Route element={<RequirePermission permission={ROUTE_PERMISSION.vendorInvitations} />}>
+            <Route path="vendor/invitations" element={<VendorInvitationsPage />} />
+            <Route path="vendor/invitations/:id" element={<VendorInvitationDetailPage />} />
           </Route>
 
           {/* Portal administration */}

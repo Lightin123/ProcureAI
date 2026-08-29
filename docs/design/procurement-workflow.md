@@ -190,6 +190,75 @@ Work-package-level states are a separate concern (Workflow Principle 5) and
 are **not yet defined**; they will be specified when work packages are
 implemented in Milestone 4.
 
+## Vendor Engagement Lifecycle (Implemented, Milestone 7)
+
+This is a **work-package-level** lifecycle and is deliberately separate from
+the project states above. It introduces **no new project state**: a project
+sits in `WORK_PACKAGES_CONFIRMED` throughout, and `IN_DISCOVERY` onwards stay
+unreachable. Engaging suppliers for one confirmed work package is not a
+statement about the project as a whole, and a project whose five packages are
+at five different stages of engagement is the normal case, not an anomaly
+(Workflow Principle 5).
+
+```
+CONFIRMED work package
+        |
+        v
+  ranked, eligible suppliers          (Milestone 6 — a read, no state)
+        |
+        v
+  SHORTLISTED  --------------------->  removed from the shortlist
+   (per work package, with a
+    recorded reason and actor)
+        |
+        v
+    INVITED  ------------------------>  WITHDRAWN   (the department cancels,
+        |                                            supplier notified)
+        +-------------------->  ACCEPTED  -->  Milestone 8's structured response
+        |
+        +-------------------->  DECLINED  (reason required)
+```
+
+### Rules
+
+- **Nothing advances automatically.** Shortlisting, inviting, withdrawing,
+  accepting and declining are each an explicit act by an identified person,
+  consistent with Workflow Principle 6.
+- A supplier can only be shortlisted against a **`CONFIRMED`** work package,
+  and only if the eligibility gate passed them. The shortlist belongs to one
+  work package: shortlisting for WP-02 says nothing about WP-01.
+- A supplier can only be invited if they are on **that package's** shortlist.
+  Eligibility is therefore enforced transitively, through one definition of
+  the gate rather than a second copy that could drift from it.
+- **One live invitation** per supplier per work package. A withdrawn or
+  declined invitation does not block a fresh one, and the fresh one is a new,
+  separately audited record rather than a mutation of the answered one (D75).
+- A supplier's answer is **single-shot**. Once accepted or declined it cannot
+  be changed, and an accepted invitation cannot be withdrawn by the
+  department — retracting it would erase a commitment the supplier made.
+- There is **no expiry state**. A passed `response_deadline` is derived when
+  the invitation is read, because manufacturing an `EXPIRED` state would
+  require a background job the system does not have (D30).
+- `ACCEPTED` means the supplier has registered an intent to respond. It is
+  not a proposal, a quotation, a commitment to supply, or an award.
+
+### What each side sees
+
+The department sees every invitation on its own work package with the full
+response record. The supplier sees only invitations addressed to it, and
+sees the work package, the deadline and the official's instructions — never
+the ranking, the scores, the eligibility verdict, the shortlist reason, or
+any other supplier (D76). The two views are different queries in different
+routers precisely so that this separation cannot erode by accident.
+
+### Notification
+
+Issuing or withdrawing an invitation writes a notification to the supplier's
+own notification list in the same request (D74). The supplier portal's header
+carries the unread count; opening a notification marks that one read and
+navigates to the invitation. There is no email, SMS or push channel — in-portal
+only.
+
 ## Related Documents
 
 - [../product/problem-statement.md](../product/problem-statement.md)

@@ -2,8 +2,9 @@
 
 **Status:** Planned conventions + current actual status. Health,
 authentication, project, and requirement-analysis endpoints are implemented as
-of Milestone 5, and work-package vendor matching and shortlisting as of
-Milestone 6, part 2; every other endpoint group below is still planned.
+of Milestone 5; work-package vendor matching and shortlisting as of
+Milestone 6, part 2; and vendor invitation, notification and response as of
+Milestone 7. Every other endpoint group below is still planned.
 
 ## Current Status
 
@@ -100,8 +101,9 @@ session:
 - `GET /api/v1/work-packages/:workPackageId/vendor-matches` — returns the
   **last stored run without recomputing anything**. Revisiting a package is a
   read: no retrieval, no embedding work, no new run row. Responds
-  `{ data: { workPackage, run, recommendations, excluded, shortlist } }`,
-  with `run: null` and empty arrays when the package has never been matched.
+  `{ data: { workPackage, run, recommendations, excluded, shortlist,
+  invitations } }`, with `run: null` and empty arrays when the package has
+  never been matched.
 - `POST /api/v1/work-packages/:workPackageId/vendor-matches` — runs the
   pipeline ("Find Suitable Vendors", and the same route recalculates when
   supplier or requirement data has moved on). Same response shape plus
@@ -123,14 +125,93 @@ session:
   entry are read server-side from the stored run and are never accepted from
   the body, so a shortlist record cannot assert a score the system did not
   produce (D69). Returns 409 `WORK_PACKAGE_NOT_CONFIRMED` if the package is
-  not `CONFIRMED`, and `{ data: { created, shortlist } }` on success.
+  not `CONFIRMED`, 409 `SUPPLIER_NOT_ASSESSED` if the supplier has not been
+  ranked against this package, 409 `SUPPLIER_NOT_ELIGIBLE` if the eligibility
+  gate excluded them, and `{ data: { created, shortlist } }` on success. Each
+  successful add is written to `work_package_history` as `SHORTLISTED` with
+  the acting official and the stated reason (D73).
 - `DELETE /api/v1/work-packages/:workPackageId/vendor-matches/shortlist/:vendorProfileId`
-  — returns `{ data: { removed: true, shortlist } }`, or 404 if the supplier
-  is not on this shortlist.
+  — returns `{ data: { removed: true, shortlist } }`, 404 if the supplier is
+  not on this shortlist, or 409 `INVITATION_OPEN` while the supplier still
+  holds a live invitation: the invitation must be withdrawn first, so the
+  shortlist an invitation was issued from cannot disappear underneath it.
+  Audited as `SHORTLIST_REMOVED`.
 
-There is no vendor-facing route in this group, and neither permission below
-is held by the `VENDOR` role: a supplier cannot see the ranking they appear
-in or who they were ranked against.
+Milestone 7 adds three invitation endpoints on the same router, resolved
+through the same organization-scoped lookup:
+
+- `GET /api/v1/work-packages/:workPackageId/vendor-matches/invitations` —
+  every invitation on this package: supplier, status, who issued it and when,
+  the deadline, the response and its timestamp, the supplier's note, and the
+  withdrawal reason where one applies.
+- `POST /api/v1/work-packages/:workPackageId/vendor-matches/invitations` —
+  body `{ vendorProfileId, message, responseDeadline }`, both optional and
+  neither defaulted. Three preconditions, all server-side: the package is in
+  the caller's organization (404 otherwise), the package is `CONFIRMED`
+  (409 `WORK_PACKAGE_NOT_CONFIRMED`), and the supplier is on **this**
+  package's shortlist (409 `SUPPLIER_NOT_SHORTLISTED`). A supplier already
+  holding a live invitation gets 409 `INVITATION_ALREADY_OPEN`. Returns 201
+  with `{ data: { invitation, invitations, shortlist } }`, and writes the
+  supplier's portal notification in the same request (D74).
+- `POST .../vendor-matches/invitations/:invitationId/withdraw` — body
+  `{ reason }`. Only an invitation still awaiting a response can be
+  withdrawn; one the supplier has accepted returns 409
+  `INVITATION_NOT_OPEN`, because retracting it would erase a commitment the
+  supplier made. The invitation is not deleted, and the supplier is notified.
+
+An invitation id is checked against **both** the caller's organization and
+the work package in the URL, so an id belonging to another department — or to
+another package in the same department — is 404, not a successful withdrawal.
+
+There is no vendor-facing route in this group, and none of the three
+government permissions below is held by the `VENDOR` role: a supplier cannot
+see the ranking they appear in or who they were ranked against.
+
+### Supplier-facing invitations (Milestone 7)
+
+Mounted at `/api/v1/vendor/invitations`, **before** `/api/v1/vendor`, which
+would otherwise take the prefix. A deliberately separate router from the
+government one (D76): the two sides see different fields, and one handler
+serving both is one `if` away from serving a department's internal assessment
+to the supplier it assessed.
+
+- `GET /api/v1/vendor/invitations` — every invitation addressed to the
+  caller's own supplier profile, newest first, answered and withdrawn ones
+  included.
+- `GET /api/v1/vendor/invitations/:invitationId` — one invitation: the
+  issuing department, the project and its reference, the work package with
+  its category, description, scope and deliverables, the deadline, the
+  official's instructions, and the supplier's own recorded response. It
+  carries **no rank, score, dimension breakdown, eligibility verdict,
+  shortlist reason, or any other supplier**. Another supplier's invitation is
+  404, never 403.
+- `POST /api/v1/vendor/invitations/:invitationId/respond` — body
+  `{ decision: "ACCEPTED" | "DECLINED", note }`. A decline without a stated
+  reason is a 400: "why" is the part a department can act on. The transition
+  is a conditional `UPDATE ... WHERE id = $1 AND vendor_profile_id = $2 AND
+  status = 'INVITED'`, so ownership and the state check are one statement and
+  a second answer returns 409 `INVITATION_NOT_OPEN` rather than overwriting
+  the first (D75). Audited against the work package as
+  `INVITATION_ACCEPTED` / `INVITATION_DECLINED`, attributed to the
+  **supplier's** user.
+
+The supplier profile is resolved from the session on every one of these. No
+route reads a vendor id, an organization id or a profile id from the request;
+an invitation id is the only thing the browser supplies, and it is only ever
+used as half of a predicate whose other half is the session's own profile.
+
+### Supplier notifications (extended in Milestone 7)
+
+- `GET /api/v1/vendor/notifications` — the caller's own notifications.
+- `GET /api/v1/vendor/notifications/summary` — the unread count, the most
+  recent few, and the number of invitations awaiting a response. Separate
+  from the dashboard because the header bell is on every page of the supplier
+  portal and must not pull the whole workspace to render a number.
+- `POST /api/v1/vendor/notifications/read` — marks all read.
+- `POST /api/v1/vendor/notifications/:notificationId/read` — marks one read,
+  which is what opening a notification does. The owning profile is part of
+  the `WHERE` clause rather than checked before it, so another supplier's
+  notification updates nothing and returns 404.
 
 **Every `/api/v1` endpoint requires an authenticated session.**
 `requireAuth` is mounted on the `/api/v1` prefix rather than per route (D52),
@@ -165,11 +246,22 @@ Permissions required by the implemented endpoints:
 | `GET .../vendor-matches/:vendorProfileId` | `vendor:matching:read` |
 | `POST .../vendor-matches/shortlist` | `vendor:shortlist:manage` |
 | `DELETE .../vendor-matches/shortlist/:vendorProfileId` | `vendor:shortlist:manage` |
+| `GET .../vendor-matches/invitations` | `vendor:matching:read` |
+| `POST .../vendor-matches/invitations` | `vendor:invitation:manage` |
+| `POST .../vendor-matches/invitations/:invitationId/withdraw` | `vendor:invitation:manage` |
+| `GET /api/v1/vendor/invitations` | `vendor:invitation:read` |
+| `GET /api/v1/vendor/invitations/:invitationId` | `vendor:invitation:read` |
+| `POST /api/v1/vendor/invitations/:invitationId/respond` | `vendor:invitation:respond` |
+| `GET /api/v1/vendor/notifications/summary` | `vendor:profile:read` |
+| `POST /api/v1/vendor/notifications/:notificationId/read` | `vendor:profile:manage` |
 
 `vendor:matching:read` is held by Government Officials and Administrators;
-`vendor:shortlist:manage` by Government Officials **only** — shortlisting is
-a procurement act and Administrators are oversight-only (D48/D60). Vendors
-hold neither.
+`vendor:shortlist:manage` and `vendor:invitation:manage` by Government
+Officials **only** — shortlisting and inviting are procurement acts and
+Administrators are oversight-only (D48/D60). `vendor:invitation:read` and
+`vendor:invitation:respond` are held by Vendors **only**, so the side that
+issued an invitation cannot answer it and the side that answers it cannot see
+how it was selected. No role holds both halves.
 
 Organization scoping is unchanged and remains authoritative: the organization
 comes from the session, never from the request, and a project — or a work
@@ -231,8 +323,9 @@ methods, and payloads are not yet designed.
 - `Requirements` — structured requirement CRUD, approval actions.
 - `Clarifications` — clarification question/answer endpoints.
 - `Work Packages` — work package CRUD.
-- `Vendors` — vendor discovery and vendor profile access are **implemented**
-  for work-package matching (above); vendor invitation is not.
+- `Vendors` — vendor discovery, vendor profile access, shortlisting and
+  **vendor invitation with the supplier's accept/decline** are implemented
+  (above).
 - `Submissions` — RFI/proposal submission endpoints.
 - `Evaluations` — evaluation and ranking retrieval.
 - `Audit` — audit log retrieval (admin-scoped).

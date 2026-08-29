@@ -14,8 +14,13 @@ import {
   createNotification,
   countUnread,
   listNotifications,
+  markNotificationRead,
   markNotificationsRead,
 } from "../repositories/vendorNotifications.js";
+import {
+  listInvitationsForVendor,
+  summariseInvitations,
+} from "../repositories/workPackageInvitations.js";
 import {
   findOpportunity,
   listOpportunities,
@@ -745,7 +750,63 @@ vendorRouter.post(
     try {
       const profile = await loadProfileForUser(getCurrentUser(request));
       await markNotificationsRead(profile.id);
-      response.json({ data: { read: true } });
+      response.json({ data: { read: true, unreadCount: 0 } });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * Marks one notification read — what opening a notification does.
+ *
+ * The id is the only thing the browser supplies, and it is applied together
+ * with the session's own profile in a single UPDATE. A notification belonging
+ * to another supplier matches no row and reads back as absent, so an id
+ * harvested from anywhere is not enough to touch it.
+ */
+vendorRouter.post(
+  "/notifications/:notificationId/read",
+  requirePermission("vendor:profile:manage"),
+  async (request, response, next) => {
+    try {
+      const profile = await loadProfileForUser(getCurrentUser(request));
+      const notificationId = parseIdOr404(request.params.notificationId);
+
+      const marked = await markNotificationRead(profile.id, notificationId);
+      if (!marked) {
+        throw new ApiError(404, "NOT_FOUND", "The notification was not found.");
+      }
+
+      response.json({ data: { read: true, unreadCount: await countUnread(profile.id) } });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * The header's badge: the unread count and the few most recent notifications.
+ *
+ * Separate from the dashboard because the header is on every page of the portal
+ * and must not pull the whole workspace — the profile, the matched
+ * opportunities and the AI suggestions — to render a number.
+ */
+vendorRouter.get(
+  "/notifications/summary",
+  requirePermission("vendor:profile:read"),
+  async (request, response, next) => {
+    try {
+      const profile = await loadProfileForUser(getCurrentUser(request));
+      const [unreadCount, notifications, invitations] = await Promise.all([
+        countUnread(profile.id),
+        listNotifications(profile.id, 6),
+        summariseInvitations(profile.id),
+      ]);
+
+      response.json({
+        data: { unreadCount, notifications, awaitingResponse: invitations.awaitingResponse },
+      });
     } catch (error) {
       next(error);
     }
@@ -856,10 +917,11 @@ vendorRouter.get(
         unmatchedOpportunityTerms: gapTerms,
       });
 
-      const [notifications, unreadCount, engagements] = await Promise.all([
+      const [notifications, unreadCount, engagements, invitations] = await Promise.all([
         listNotifications(profile.id, 8),
         countUnread(profile.id),
         summariseEngagements(profile.id),
+        summariseInvitations(profile.id),
       ]);
 
       const deadlines = opportunities
@@ -906,6 +968,9 @@ vendorRouter.get(
             savedOpportunities: engagements.savedCount,
             interestSubmitted: engagements.interestCount,
             unreadNotifications: unreadCount,
+            invitations: invitations.total,
+            invitationsAwaitingResponse: invitations.awaitingResponse,
+            invitationsAccepted: invitations.accepted,
           },
           recommendedOpportunities: scored.slice(0, 5).map((item) => ({
             ...item.opportunity,
@@ -925,6 +990,12 @@ vendorRouter.get(
           upcomingDeadlines: deadlines,
           suggestions,
           notifications,
+          // The open ones only. A dashboard is a call to action, and an
+          // invitation that has already been answered is not one; the full
+          // history lives on the invitations page.
+          openInvitations: (await listInvitationsForVendor(profile.id))
+            .filter((invitation) => invitation.status === "INVITED")
+            .slice(0, 5),
         },
       });
     } catch (error) {

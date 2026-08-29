@@ -1,4 +1,5 @@
 import { query } from "../db/pool.js";
+import { toIsoDay } from "./dates.js";
 
 /**
  * The vendor-facing view of a procurement project.
@@ -95,7 +96,7 @@ async function attachRequirements(rows: OpportunityRow[]): Promise<VendorOpportu
     departmentName: row.department_name,
     status: row.status,
     publishedAt: row.published_at.toISOString(),
-    responseDeadline: row.response_deadline?.toISOString().slice(0, 10) ?? null,
+    responseDeadline: toIsoDay(row.response_deadline),
     requirements: byProject.get(row.id) ?? [],
     saved: row.saved ?? false,
     interestState: row.interest_state ?? "NONE",

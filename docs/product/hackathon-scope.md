@@ -6,7 +6,7 @@ vision, and marks what is currently implemented.
 
 ## Currently Implemented
 
-Milestones 1 through 5, and a substantial portion of Milestone 6 — see
+Milestones 1 through 7 — see
 [../development-roadmap.md](../development-roadmap.md) for full detail.
 
 - **Milestone 1** — React frontend and Express backend communicating over
@@ -25,49 +25,55 @@ Milestones 1 through 5, and a substantial portion of Milestone 6 — see
   role-based access control across three roles (Government Official,
   Administrator, Vendor), with organization-scoped authorization enforced
   on every request.
-- **Milestone 6 (in progress):**
-  - *Implemented* — public vendor self-registration; progressive,
-    schema-driven vendor onboarding across many industries (not
-    technology-only); vendor capability profiles with structured data,
-    repeatable entities (products/services, experience, credentials), and
-    compliance document upload; admin-side vendor verification; a vendor
-    portal (dashboard, opportunity discovery, save/interest); government-
-    side opportunity publication; and **deterministic, project-level,
-    lexical** vendor-to-opportunity matching.
-  - *Not yet implemented* — work-package-level matching, eligibility
-    filtering as a distinct gate, pgvector/embeddings, hybrid (lexical +
-    semantic) retrieval, vendor ranking per work package, vendor
-    shortlisting and invitation. See
-    [../ai/vendor-discovery.md](../ai/vendor-discovery.md).
+- **Milestone 6** — the vendor ecosystem: public vendor self-registration;
+  progressive, schema-driven onboarding across many industries (not
+  technology-only); vendor capability profiles with structured data,
+  repeatable entities (products/services, experience, credentials), and
+  compliance document upload; admin-side verification; a vendor portal
+  (dashboard, opportunity discovery, save/interest); government-side
+  opportunity publication; and **work-package-level hybrid matching** —
+  deterministic eligibility as a hard gate, lexical + pgvector semantic
+  retrieval unioned, seven-dimension ranking, and explanations built only
+  from stored values. See
+  [../ai/vendor-discovery.md](../ai/vendor-discovery.md).
+- **Milestone 7** — shortlisting and engagement: an official compares
+  ranked suppliers side by side, shortlists them per work package with a
+  recorded reason, and invites shortlisted suppliers to respond. The
+  supplier is notified in the portal, opens the invitation, sees the work
+  package it concerns, and accepts or declines with a reason. Every
+  shortlist and invitation act is audited against the work package. The
+  structured proposal itself is Milestone 8.
 
 All three services (`apps/web`, `apps/api`, `apps/ai-service`) run together.
 
 ## Current Development Stage
 
-Milestone 5 is complete and Milestone 6 is in progress. The immediate
-development priority is moving Milestone 6's vendor matching from
-project-level lexical matching to **work-package-level hybrid matching**
-(deterministic eligibility filtering + lexical + semantic retrieval +
-multi-factor ranking + explanation) — see
-[../ai/vendor-discovery.md](../ai/vendor-discovery.md) and
+Milestones 1 through 7 are complete. The next milestone is **Milestone 8 —
+vendor response and proposal collection**: letting an invited supplier who has
+accepted submit a structured, deadline-bound response against the work package
+it accepted, and letting the official configure and track that process. See
 [../development-roadmap.md](../development-roadmap.md).
+
+Nothing in Milestone 7 anticipates that schema. Accepting an invitation
+registers intent to respond and no more; the response entity is deliberately
+unmodelled until the workflow that uses it is specified — the same reasoning
+that kept the shortlist minimal in Milestone 6 (D69).
 
 The roadmap was re-sequenced twice from the original problem-statement
 ordering: authentication and RBAC (Milestone 5) were moved ahead of vendor
 work (D43), and within Milestone 6, vendor onboarding was built before
 work-package-level matching, for the same reason — matching needs vendors
-and work packages to exist first.
+and work packages to exist first. Milestone 7 followed the same dependency:
+an invitation needs a shortlist, and a shortlist needs a ranking.
 
 ## Explicitly Out of Scope for the Current Stage
 
 Per project instructions, the following must **not** be implemented until
 explicitly requested:
 
-- Work-package-level vendor matching, eligibility filtering, pgvector,
-  embeddings, and hybrid semantic retrieval (the immediate next priority,
-  but not yet started as of this document).
-- Vendor shortlisting and invitation workflow (Milestone 7).
-- RFI/proposal collection from vendors (Milestone 8).
+- RFI/proposal collection from vendors (Milestone 8) — including the
+  response form, deadline configuration, submission tracking and
+  clarification requests. Milestone 7 stops at the accepted invitation.
 - Document intelligence and vendor response evaluation (Milestone 9).
 - Vendor gap analysis and procurement analytics (Milestone 10).
 - Advanced semantic optimization — learned ranking, query expansion,
@@ -85,11 +91,13 @@ exists, likely includes at minimum:
 - Work package generation and confirmation (built).
 - Vendor onboarding and a populated, multi-sector seeded vendor base
   (built).
-- Work-package-level matching with an explainable ranked list — the
-  current priority; a basic version (even lexical-only, package-scoped) is
-  likely more demo-valuable than a project-level-only demo.
-- A shortlisting/invitation step, even a minimal one, to show the human
-  decision loop closing.
+- Work-package-level matching with an explainable ranked list, its
+  eligibility exclusions inspectable alongside it (built).
+- Shortlisting, invitation, the supplier's in-portal notification, and the
+  supplier accepting or declining — the human decision loop closing across
+  both sides of the platform (built). `npx tsx scripts/engagementDemo.ts`
+  puts a seeded work package into the invited state so the supplier half of
+  the demonstration has something to open.
 
 **This list is a reasonable inference, not a confirmed decision.** The
 exact hackathon-demo cut should be revisited in

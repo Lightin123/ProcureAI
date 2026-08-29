@@ -260,32 +260,99 @@ Lexical Search                Semantic Search (pgvector / HNSW)
 - [x] **Shortlist seam** for Milestone 7 (D69): a minimal
       `work_package_shortlist` table with add/remove endpoints, the rank and
       score read server-side from the stored run rather than accepted from
-      the browser. Invitation and everything downstream is *not* built.
+      the browser. Invitation and everything downstream was not built here —
+      it is Milestone 7, which builds on this table unchanged.
 
 Migration `006_work_package_matching.sql`. Delivers FR4.1, FR4.2 and FR4.3.
 
 Not built in this milestone, and deliberately deferred: vendor invitation and
-the engagement workflow around the shortlist (Milestone 7), and vendor gap
-analysis (Milestone 10).
+the engagement workflow around the shortlist (**built in Milestone 7**), and
+vendor gap analysis (Milestone 10).
 
-## Milestone 7 — Vendor Shortlisting and Engagement (Planned, Not Detailed)
+## Milestone 7 — Vendor Shortlisting and Engagement (Complete)
 
 Goal: let an official act on ranked recommendations rather than only view
-them.
+them, and let the supplier answer.
 
-- View ranked, explained vendors per work package (**built** in Milestone
-  6's second half).
-- Compare vendors side by side; inspect a vendor's full profile and match
-  explanation from within the comparison.
-- Build and maintain a shortlist per work package: add, remove, and record
-  a reason for the decision (supports FR11.1 — auditability of *why*, not
-  only *what*).
-- Invite shortlisted vendors. An invitation is the trigger for Milestone 8;
-  it is not itself a commitment.
-- AI recommends; the official decides. No automatic vendor selection.
+    confirmed work package
+      -> ranked, eligible suppliers      (Milestone 6)
+      -> compare, inspect
+      -> shortlist, with a recorded reason
+      -> invitation
+      -> supplier notification
+      -> supplier accepts or declines
+      -> Milestone 8's structured response
 
-Depends on Milestone 6's second half (work-package-level ranked
-recommendations) existing to act on.
+- [x] **Recommendation review** — already delivered by Milestone 6's second
+      half and unchanged here: the ranked list, all seven dimensions with
+      their reasoning, lexical/semantic retrieval evidence, the eligibility
+      result with its individual checks, matched and missing capability
+      terms, verification state, relevant experience, credentials, capacity
+      and geographic coverage.
+- [x] **Side-by-side comparison** of up to four suppliers, extended in this
+      milestone with capability coverage, relevant experience, credentials,
+      geographic coverage, profile completion, per-supplier matched and
+      missing capability terms, and the exclusion ground for any supplier
+      the gate refused.
+- [x] **Work-package shortlist**, built on Milestone 6's seam (D69): add
+      with a mandatory recorded reason, remove, and view — per work package
+      and never per project, so shortlisting a supplier for WP-02 says
+      nothing about WP-01. An ineligible supplier is refused by the API, not
+      merely by a disabled button.
+- [x] **Shortlist auditability** (D73): every add and remove is written to
+      `work_package_history` with the acting official, the action, the
+      reason and the timestamp, alongside the decisions that produced the
+      package itself.
+- [x] **Invitation** of a shortlisted supplier, carrying the work package,
+      the issuing department and official, an optional response deadline,
+      optional written instructions, and a status. Three preconditions are
+      enforced server-side: the package is in the caller's organization, the
+      package is `CONFIRMED`, and the supplier is on *this* package's
+      shortlist. Eligibility is enforced transitively through the shortlist
+      rather than re-checked, so there is one definition of the gate.
+- [x] **Invitation lifecycle** (D75): `INVITED -> ACCEPTED | DECLINED |
+      WITHDRAWN`, enforced by a conditional `UPDATE`, with a partial unique
+      index permitting one live invitation per supplier per package. No
+      `EXPIRED` state — expiry would need a background job, which this
+      system does not have (D30); a passed deadline is derived at read time.
+- [x] **Supplier notification** (D74), written into the existing
+      `vendor_notifications` table in the same request that creates the
+      invitation. A bell in the portal header carries the unread count and
+      the recent list; opening a notification marks that one read and
+      navigates to the invitation it is about.
+- [x] **Supplier invitation portal** at `/vendor/invitations` and
+      `/vendor/invitations/:id`: the department, the project, the work
+      package with its scope and deliverables, the deadline, the official's
+      instructions, and accept/decline. Declining requires a stated reason.
+- [x] **Government invitation tracking** on the matching page: every
+      invitation on the package, its status, who issued it and when, the
+      deadline, the response and its timestamp, and the supplier's note.
+- [x] **Strict separation of the two sides** (D76): the supplier's view is a
+      different query in a different router, and carries no rank, score,
+      dimension breakdown, eligibility verdict, shortlist reason or any
+      other supplier.
+- [x] **RBAC**: `vendor:invitation:manage` for `GOVERNMENT_OFFICIAL`;
+      `vendor:invitation:read` and `vendor:invitation:respond` for `VENDOR`.
+      `ADMIN` gains neither — oversight reads a ranking but takes no
+      procurement decision (D48, D60, D69).
+
+Migration `008_vendor_engagement.sql`. Delivers FR4.4 and supports FR11.1's
+requirement that *why* a decision was taken is auditable, not only *what*.
+
+Verified by `apps/api/tests/engagement.integration.test.ts` — 41 tests over
+HTTP covering the whole flow and, mostly, the requests that must be refused:
+cross-organization access, cross-supplier access, an ineligible supplier, a
+non-shortlisted supplier, an unconfirmed package, a duplicate invitation, a
+second response, a withdrawal of an accepted invitation, and an
+administrator attempting a procurement act.
+
+`npx tsx scripts/engagementDemo.ts` puts one seeded work package into the
+shortlisted-and-invited state so the supplier side of a demonstration has
+something to open.
+
+Not built, and deliberately left to Milestone 8: the structured response
+itself. Accepting an invitation registers intent to respond; it is not a
+proposal, a quotation or a commitment to supply.
 
 ## Milestone 8 — Vendor Response and Proposal Collection (Planned, Not Detailed)
 

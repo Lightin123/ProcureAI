@@ -1,4 +1,5 @@
 import { apiRequest } from "./client.js";
+import type { VendorInvitation } from "./vendorInvitations.js";
 
 // ---------------------------------------------------------------------------
 // Onboarding schema — served by the API so the questionnaire, its validation
@@ -334,8 +335,16 @@ export interface VendorNotification {
   title: string;
   body: string;
   linkPath: string | null;
+  /** Set when the notification is about a procurement invitation. */
+  invitationId: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+export interface NotificationSummary {
+  unreadCount: number;
+  notifications: VendorNotification[];
+  awaitingResponse: number;
 }
 
 export interface ProfileSuggestion {
@@ -373,6 +382,9 @@ export interface VendorDashboard {
     savedOpportunities: number;
     interestSubmitted: number;
     unreadNotifications: number;
+    invitations: number;
+    invitationsAwaitingResponse: number;
+    invitationsAccepted: number;
   };
   recommendedOpportunities: VendorOpportunity[];
   savedOpportunities: VendorOpportunity[];
@@ -392,6 +404,7 @@ export interface VendorDashboard {
   }>;
   suggestions: ProfileSuggestion[];
   notifications: VendorNotification[];
+  openInvitations: VendorInvitation[];
 }
 
 // ---------------------------------------------------------------------------
@@ -510,8 +523,25 @@ export function fetchNotifications(signal?: AbortSignal): Promise<VendorNotifica
   return apiRequest<VendorNotification[]>(`${BASE}/notifications`, { signal });
 }
 
-export function markNotificationsRead(): Promise<{ read: boolean }> {
-  return apiRequest<{ read: boolean }>(`${BASE}/notifications/read`, { method: "POST" });
+export function markNotificationsRead(): Promise<{ read: boolean; unreadCount: number }> {
+  return apiRequest<{ read: boolean; unreadCount: number }>(`${BASE}/notifications/read`, {
+    method: "POST",
+  });
+}
+
+/** Marks one notification read — what opening it from the bell does. */
+export function markNotificationRead(
+  notificationId: string,
+): Promise<{ read: boolean; unreadCount: number }> {
+  return apiRequest<{ read: boolean; unreadCount: number }>(
+    `${BASE}/notifications/${notificationId}/read`,
+    { method: "POST" },
+  );
+}
+
+/** The header badge's own request: the count and the most recent few. */
+export function fetchNotificationSummary(signal?: AbortSignal): Promise<NotificationSummary> {
+  return apiRequest<NotificationSummary>(`${BASE}/notifications/summary`, { signal });
 }
 
 export function requestCapabilityInsights(): Promise<{

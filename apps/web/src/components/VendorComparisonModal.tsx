@@ -187,6 +187,80 @@ export function VendorComparisonModal({
                   style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}
                 >
                   {recommendation.retrievalSources.join(" + ").toLowerCase()}
+                  {recommendation.semanticSimilarity !== null && (
+                    <div>cosine {recommendation.semanticSimilarity.toFixed(3)}</div>
+                  )}
+                </td>
+              ))}
+            </tr>
+
+            {/* Counts rather than the terms themselves: the full lists are in
+                the evidence panel below, and a table cell holding twenty chips
+                stops being comparable, which is the only thing a table is for. */}
+            <tr>
+              <th scope="row">Capability coverage</th>
+              {recommendations.map((recommendation) => (
+                <td key={recommendation.vendor.vendorProfileId} style={{ fontSize: "13px" }}>
+                  {recommendation.evidence.matchedCapabilities.length} matched
+                  <div style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}>
+                    {recommendation.evidence.missingCapabilities.length} package term(s) absent
+                  </div>
+                </td>
+              ))}
+            </tr>
+
+            <tr>
+              <th scope="row">Relevant experience</th>
+              {recommendations.map((recommendation) => (
+                <td key={recommendation.vendor.vendorProfileId} style={{ fontSize: "13px" }}>
+                  {recommendation.evidence.relevantExperience.length === 0 ? (
+                    <span style={{ color: "var(--gov-text-muted)" }}>None recorded</span>
+                  ) : (
+                    <>
+                      {recommendation.evidence.relevantExperience[0]?.title}
+                      {recommendation.evidence.relevantExperience.length > 1 && (
+                        <div style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}>
+                          and {recommendation.evidence.relevantExperience.length - 1} more
+                        </div>
+                      )}
+                    </>
+                  )}
+                </td>
+              ))}
+            </tr>
+
+            <tr>
+              <th scope="row">Credentials recorded</th>
+              {recommendations.map((recommendation) => (
+                <td key={recommendation.vendor.vendorProfileId} style={{ fontSize: "13px" }}>
+                  {recommendation.evidence.credentials.length === 0 ? (
+                    <span style={{ color: "var(--gov-text-muted)" }}>None recorded</span>
+                  ) : (
+                    recommendation.evidence.credentials.slice(0, 3).join(", ")
+                  )}
+                </td>
+              ))}
+            </tr>
+
+            <tr>
+              <th scope="row">Geographic coverage</th>
+              {recommendations.map((recommendation) => (
+                <td key={recommendation.vendor.vendorProfileId} style={{ fontSize: "13px" }}>
+                  {recommendation.vendor.serviceCoverage ?? "Not stated"}
+                  <div style={{ fontSize: "12px", color: "var(--gov-text-muted)" }}>
+                    {recommendation.vendor.operatingStates.length === 0
+                      ? "No operating states recorded"
+                      : `${recommendation.vendor.operatingStates.length} operating state(s)`}
+                  </div>
+                </td>
+              ))}
+            </tr>
+
+            <tr>
+              <th scope="row">Profile completion</th>
+              {recommendations.map((recommendation) => (
+                <td key={recommendation.vendor.vendorProfileId} style={{ fontSize: "13px" }}>
+                  {recommendation.vendor.completionPercentage}%
                 </td>
               ))}
             </tr>
@@ -253,10 +327,79 @@ export function VendorComparisonModal({
                 >
                   Gaps
                 </span>
-                <ul className="gov-plain-list" style={{ margin: "4px 0 0" }}>
+                <ul className="gov-plain-list" style={{ margin: "4px 0 10px" }}>
                   {recommendation.evidence.gaps.slice(0, 4).map((gap) => (
                     <li key={gap} style={{ fontSize: "12px" }}>
                       &#9888; {gap}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {/* An ineligible supplier's exclusion ground is stated in full and
+                never abbreviated: it is the only fact in this panel that
+                decides whether the scores above it mean anything. */}
+            {!recommendation.eligible && recommendation.eligibility.failedChecks.length > 0 && (
+              <>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    color: "var(--gov-danger-dark)",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Excluded because
+                </span>
+                <ul className="gov-plain-list" style={{ margin: "4px 0 10px" }}>
+                  {recommendation.eligibility.failedChecks.map((check) => (
+                    <li key={`${check.code}-${check.label}`} style={{ fontSize: "12px" }}>
+                      <strong>{check.label}</strong> — {check.evidence}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {recommendation.evidence.matchedCapabilities.length > 0 && (
+              <>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    color: "var(--gov-text-muted)",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Matched capability terms
+                </span>
+                <ul className="gov-chip-list">
+                  {recommendation.evidence.matchedCapabilities.slice(0, 10).map((term) => (
+                    <li key={term} className="gov-chip gov-chip--match">
+                      {term}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {recommendation.evidence.missingCapabilities.length > 0 && (
+              <>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    color: "var(--gov-text-muted)",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Package terms not present in the profile
+                </span>
+                <ul className="gov-chip-list">
+                  {recommendation.evidence.missingCapabilities.slice(0, 10).map((term) => (
+                    <li key={term} className="gov-chip gov-chip--gap">
+                      {term}
                     </li>
                   ))}
                 </ul>

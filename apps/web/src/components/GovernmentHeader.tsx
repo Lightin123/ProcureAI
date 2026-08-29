@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext.js";
-import { NAV_ITEMS, landingPathFor } from "../auth/routeAccess.js";
+import { NAV_ITEMS, ROUTE_PERMISSION, landingPathFor } from "../auth/routeAccess.js";
 import { EmblemIcon } from "./GovernmentIcons.js";
+import { NotificationBell } from "./NotificationBell.js";
 
 function initialsOf(fullName: string): string {
   const parts = fullName.split(/\s+/).filter((part) => part !== "");
@@ -79,6 +80,11 @@ export function GovernmentHeader() {
           {/* Session Area */}
           {user !== undefined && (
             <div className="gov-main-header__user-box">
+              {/* Supplier accounts only. The endpoints behind it resolve the
+                  supplier profile from the session, so this is a usability
+                  control and not the place access is decided. */}
+              {hasPermission(ROUTE_PERMISSION.vendor) && <NotificationBell />}
+
               <div className="gov-user-avatar" aria-hidden="true">
                 {initialsOf(user.fullName)}
               </div>

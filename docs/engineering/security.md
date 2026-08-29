@@ -77,6 +77,50 @@ remain attributable to the government official who made it.
 `system:status:read` either. They are not restricted by a check that could be
 bypassed — there is no grant to bypass.
 
+### The two sides of an invitation (Milestone 7)
+
+An invitation is the one record both a department and a supplier read, so it
+is the place where a leak would be easiest and least visible. Three
+structural measures rather than one check:
+
+1. **Different permissions, held by disjoint roles.**
+   `vendor:invitation:manage` (issue, withdraw) is `GOVERNMENT_OFFICIAL`
+   only; `vendor:invitation:read` and `vendor:invitation:respond` are
+   `VENDOR` only. No role holds both halves — the side that issues an
+   invitation cannot answer it, and the side that answers cannot see the
+   ranking it came from. `ADMIN` holds neither, consistent with D48/D60.
+
+2. **Different queries, in different routers** (D76). The supplier's view of
+   an invitation is a separate SQL statement in
+   `repositories/workPackageInvitations.ts` that never selects a rank, a
+   score, a dimension breakdown, an eligibility verdict, a shortlist reason
+   or any other supplier. One handler serving both sides with a role flag
+   would be one `if` away from serving a department's internal assessment to
+   the supplier it assessed, and the failure would be silent; two queries
+   that never had the columns cannot leak them.
+
+3. **Ownership applied in the predicate, not before it.** Every
+   supplier-facing function takes `vendorProfileId` as a non-optional
+   argument used in its `WHERE` clause — there is no "find by id" a vendor
+   route could call without it. The response transition is a single
+   conditional `UPDATE ... WHERE id = $1 AND vendor_profile_id = $2 AND
+   status = 'INVITED'`, so ownership and the state check happen in one
+   statement with no window between them, and a second answer changes
+   nothing rather than overwriting the first. Marking a notification read
+   works the same way.
+
+The government side is scoped identically: an invitation id is checked
+against both the caller's organization **and** the work package in the URL,
+so an id belonging to another department — or to another package in the same
+department — is 404.
+
+Invitation preconditions are all server-side and none of them is expressed in
+the browser alone: the package must be in the caller's organization, it must
+be `CONFIRMED`, and the supplier must be on **that** package's shortlist. The
+shortlist itself already refused any supplier the eligibility gate excluded,
+so "an ineligible supplier cannot be invited" holds transitively through one
+definition of the gate rather than through a second copy that could drift.
+
 Frontend routes and navigation entries are filtered by the same permissions,
 but that is a usability measure. Where a screen displays server data, the
 endpoint behind it enforces the same permission — the System Status page is
@@ -108,6 +152,11 @@ remembered. `GET /health` is registered before that mount and stays public.
 | Client-supplied organization spoofing | Same — organization comes only from the session-resolved user row | `middleware/auth.ts` |
 | Plaintext password storage | `scrypt` with a per-password salt; plaintext exists only inside the login handler and is never logged or persisted | `auth/password.ts` |
 | Password hash exposure | Selected by one repository function used only by login; no `SELECT *`; no DTO field for it | `repositories/users.ts` |
+| Cross-supplier invitation access | The supplier profile comes from the session; the invitation id is only ever half of a predicate whose other half is that profile. Another supplier's invitation matches no row and returns 404 | `repositories/workPackageInvitations.ts` |
+| Cross-supplier notification access | Same shape: the read-marking `UPDATE` filters on `vendor_profile_id` from the session, so another supplier's notification updates nothing | `repositories/vendorNotifications.ts` |
+| A department's internal assessment leaking to the supplier it assessed | The supplier-facing query does not select rank, score, dimensions, eligibility or shortlist reason, and lives in a different router from the government one (D76) | `routes/vendorInvitations.ts` |
+| Inviting a supplier who was never shortlisted or was ruled ineligible | The shortlist row is resolved server-side as the precondition, never accepted as an id from the body; the shortlist itself refuses an ineligible supplier | `repositories/workPackageInvitations.ts` |
+| A supplier answering on another supplier's behalf, or answering twice | Ownership and the state check are one conditional `UPDATE` on `status = 'INVITED'`; there is no read-then-write window | `repositories/workPackageInvitations.ts` |
 | Session token theft from the database | Only the SHA-256 hash is stored, so a dump yields nothing replayable | `repositories/sessions.ts` |
 | Session theft via XSS | `HttpOnly` — script cannot read the cookie. Nothing auth-related is kept in `localStorage` or `sessionStorage` | Cookie attributes |
 | Session fixation | No pre-authentication session exists and no caller can propose a token; login always mints a new one and revokes the previous | `routes/auth.ts` |
@@ -156,6 +205,16 @@ performed it. `procurement_projects.created_by`,
 `clarification_questions.answered_by`, and `project_stage_history.actor_id`
 now carry a real authenticated identity rather than a seeded constant (D50,
 D53). `users.last_login_at` records authentication itself.
+
+Milestone 7 extends the same principle to engagement (D73). Shortlisting,
+removing a shortlist entry, issuing an invitation, withdrawing one, and the
+supplier's acceptance or decline are all written to `work_package_history`
+with the acting user, the action, the reason and the timestamp — the table
+every other work-package decision already writes to, rather than a parallel
+one. A supplier's acceptance is attributed to the **supplier's** own user
+account, so the department never appears in the record as the author of an
+answer it did not give. The invitation row itself independently carries
+`invited_by`, `responded_by` and `withdrawn_by`.
 
 A general audit log (FR11) still does not exist; whether authentication events
 warrant their own table is U31.

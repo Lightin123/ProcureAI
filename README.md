@@ -6,11 +6,12 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 6 (Vendor Ecosystem) complete — suppliers
-> self-register and are verified, and for a confirmed work package an official
-> gets a ranked, explainable list of eligible suppliers produced by
-> deterministic eligibility filtering plus hybrid lexical and semantic
-> retrieval. See [Current Status](#current-status) below.
+> **Project status:** Milestone 7 (Vendor Shortlisting and Engagement)
+> complete — for a confirmed work package an official gets a ranked,
+> explainable list of eligible suppliers, compares them, shortlists them with
+> a recorded reason, and invites the shortlisted ones. The supplier is
+> notified in its own portal, opens the invitation, and accepts or declines.
+> See [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -122,16 +123,19 @@ those, and for any confirmed package run supplier matching. Every action is
 recorded against the authenticated user who performed it.
 
 Suppliers self-register, complete a progressive capability onboarding, are
-verified by an administrator, and see published opportunities matched against
-their own profile.
+verified by an administrator, see published opportunities matched against
+their own profile, and receive and answer invitations to specific work
+packages.
 
 - `apps/web` — React + TypeScript + Vite. Sign-in, projects register, project
   detail, create form, requirements review, work packages, supplier matching
-  with comparison and shortlisting, the vendor portal, the supplier registry,
-  and System Status. Routes and navigation are permission-aware.
+  with comparison, shortlisting and invitation tracking, the vendor portal
+  with its notification bell and invitation pages, the supplier registry, and
+  System Status. Routes and navigation are permission-aware.
 - `apps/api` — Express + TypeScript. Authentication, projects, requirement
-  analysis, work packages, vendor profiles, and work-package supplier matching,
-  backed by PostgreSQL (with pgvector) via `pg`.
+  analysis, work packages, vendor profiles, work-package supplier matching,
+  and supplier shortlisting, invitation and response, backed by PostgreSQL
+  (with pgvector) via `pg`.
 - `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
   analysis, work-package decomposition and capability insights across three
   interchangeable providers (OpenAI-compatible — currently Groq — Anthropic,
@@ -154,6 +158,23 @@ exclusions and their grounds are shown to the official alongside the ranking.
 Every AI suggestion is reviewable — nothing enters the confirmed record
 without an explicit decision by the official.
 
+**Shortlisting, invitation and response.** An official shortlists an eligible
+supplier against one work package, stating why; the reason, the official and
+the rank and score at that moment are all recorded. A shortlisted supplier can
+then be invited to respond, with optional instructions and a response date. The
+supplier is notified in its own portal — a bell in the header carries the
+unread count — opens the invitation, sees the work package it concerns, and
+accepts or declines with a stated reason. The department tracks who answered
+and how. Every one of these acts is written to the work package's audit
+history, with a supplier's answer attributed to the supplier's own account.
+
+The two sides are kept apart deliberately: a supplier never sees the ranking
+it appeared in, the scores, the eligibility verdict, the department's
+shortlist reason, or any other supplier — those are different queries in a
+different router, not the same response with fields hidden. An invitation is
+not an award: accepting registers an intent to respond, and the structured
+response itself is Milestone 8.
+
 **Authentication and access control.** Sessions are opaque tokens stored in
 PostgreSQL and delivered in an `HttpOnly; SameSite=Strict` cookie; passwords
 are hashed with `scrypt`. Three roles exist — Government Official,
@@ -164,8 +185,7 @@ another's projects by changing a URL. The frontend hides controls a role
 cannot use, but the backend is the boundary that actually enforces it. See
 [docs/engineering/security.md](docs/engineering/security.md).
 
-Not implemented: vendor invitation and the engagement workflow around the
-shortlist (Milestone 7), structured vendor responses and proposal evaluation
+Not implemented: structured vendor responses and proposal evaluation
 (Milestones 8–9), and vendor gap analysis (Milestone 10). See
 [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
 and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for
@@ -296,14 +316,31 @@ Scripts: `npm run dev`, `npm run build`, `npm run typecheck` in both
 projects; `npm run migrate` and `npm run seed` in `apps/api`.
 
 Tests, in `apps/api`: `npm test` runs the matching unit suite and needs no
-database or AI service. `npm run test:integration` exercises the full matching
-pipeline against real data and needs both — run `npm run migrate && npm run
-seed` first, and have `apps/ai-service` running. It skips rather than fails
-when `DATABASE_URL` is unset.
+database or AI service. `npm run test:integration` runs two suites against
+real data — the matching pipeline, and the shortlist/invitation/notification
+flow over HTTP. Run `npm run migrate && npm run seed` first, have
+`apps/ai-service` running, and have the API itself running (`npm run dev`) for
+the engagement suite. Both skip rather than fail when their dependencies are
+absent.
 
-`npx tsx scripts/matchDemo.ts` prints the ranking every confirmed package in
-the seeded demonstration project produces, which is the quickest way to see
-the eligibility gate and hybrid retrieval working.
+The engagement suite is mostly about requests that must be **refused**:
+cross-organization access, cross-supplier access, an ineligible supplier, a
+non-shortlisted supplier, an unconfirmed package, a duplicate invitation, a
+second response, withdrawing an accepted invitation, and an administrator
+attempting a procurement act. It cleans up after itself, leaving the seeded
+demonstration data as it found it.
+
+Two development scripts, neither part of the application:
+
+- `npx tsx scripts/matchDemo.ts` prints the ranking every confirmed package in
+  the seeded demonstration project produces — the quickest way to see the
+  eligibility gate and hybrid retrieval working.
+- `npx tsx scripts/engagementDemo.ts` puts one seeded work package (WP-04 by
+  default) into the shortlisted-and-invited state, so the supplier half of a
+  demonstration — the notification bell, the invitation, accept or decline —
+  has something to open. Idempotent, and it goes through the same repository
+  functions the API does, so the rows it leaves are the rows an official's
+  clicks would have produced.
 
 ---
 

@@ -145,6 +145,38 @@ export interface ShortlistEntry {
   reason: string | null;
   addedByName: string;
   createdAt: string;
+  /** Null until the supplier is invited; then the latest invitation's state. */
+  invitationId: string | null;
+  invitationStatus: InvitationStatus | null;
+  invitedAt: string | null;
+}
+
+export type InvitationStatus = "INVITED" | "ACCEPTED" | "DECLINED" | "WITHDRAWN";
+
+/**
+ * An invitation as the issuing department sees it — including who answered and
+ * what they said. The supplier's own view of the same row is narrower and is
+ * served by a different endpoint.
+ */
+export interface WorkPackageInvitation {
+  id: string;
+  workPackageId: string;
+  projectId: string;
+  vendorProfileId: string;
+  organizationName: string;
+  legalName: string | null;
+  verificationState: string;
+  status: InvitationStatus;
+  message: string | null;
+  responseDeadline: string | null;
+  invitedByName: string;
+  invitedAt: string;
+  respondedByName: string | null;
+  respondedAt: string | null;
+  responseNote: string | null;
+  withdrawnByName: string | null;
+  withdrawnAt: string | null;
+  withdrawalReason: string | null;
 }
 
 export interface VendorMatchView {
@@ -154,6 +186,7 @@ export interface VendorMatchView {
   recommendations: VendorRecommendation[];
   excluded: VendorRecommendation[];
   shortlist: ShortlistEntry[];
+  invitations: WorkPackageInvitation[];
 }
 
 export interface VendorMatchDetail {
@@ -231,5 +264,42 @@ export async function removeShortlistedVendor(workPackageId: string, vendorProfi
   return apiRequest<{ removed: boolean; shortlist: ShortlistEntry[] }>(
     `${base(workPackageId)}/shortlist/${vendorProfileId}`,
     { method: "DELETE" },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Invitations
+// ---------------------------------------------------------------------------
+
+export async function listInvitations(workPackageId: string, signal?: AbortSignal) {
+  return apiRequest<WorkPackageInvitation[]>(`${base(workPackageId)}/invitations`, { signal });
+}
+
+/**
+ * Issues an invitation to a shortlisted supplier.
+ *
+ * The API refuses a supplier who is not on this package's shortlist and a
+ * supplier who already holds a live invitation, so the portal's own guards are
+ * a convenience rather than the rule.
+ */
+export async function inviteVendor(
+  workPackageId: string,
+  body: { vendorProfileId: string; message: string | null; responseDeadline: string | null },
+) {
+  return apiRequest<{
+    invitation: WorkPackageInvitation;
+    invitations: WorkPackageInvitation[];
+    shortlist: ShortlistEntry[];
+  }>(`${base(workPackageId)}/invitations`, { method: "POST", body });
+}
+
+export async function withdrawInvitation(
+  workPackageId: string,
+  invitationId: string,
+  reason: string | null,
+) {
+  return apiRequest<{ invitations: WorkPackageInvitation[]; shortlist: ShortlistEntry[] }>(
+    `${base(workPackageId)}/invitations/${invitationId}/withdraw`,
+    { method: "POST", body: { reason } },
   );
 }

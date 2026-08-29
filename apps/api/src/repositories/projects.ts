@@ -1,4 +1,5 @@
 import { query } from "../db/pool.js";
+import { toIsoDay } from "./dates.js";
 
 export interface ProcurementProject {
   id: string;
@@ -55,7 +56,7 @@ function toProject(row: ProjectRow): ProcurementProject {
     createdByName: row.created_by_name,
     publishedAt: row.published_at?.toISOString() ?? null,
     opportunitySummary: row.opportunity_summary,
-    responseDeadline: row.response_deadline?.toISOString().slice(0, 10) ?? null,
+    responseDeadline: toIsoDay(row.response_deadline),
     interestCount: Number.parseInt(row.interest_count, 10),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),

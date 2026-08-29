@@ -10,6 +10,7 @@ import { projectsRouter } from "./routes/projects.js";
 import { requirementsRouter } from "./routes/requirements.js";
 import { systemRouter } from "./routes/system.js";
 import { vendorRouter } from "./routes/vendor.js";
+import { vendorInvitationsRouter } from "./routes/vendorInvitations.js";
 import { vendorMatchingRouter } from "./routes/vendorMatching.js";
 import { vendorRegistryRouter } from "./routes/vendorRegistry.js";
 import {
@@ -48,6 +49,9 @@ app.use("/api/v1/work-packages/:workPackageId/vendor-matches", vendorMatchingRou
 app.use("/api/v1/work-packages", directWorkPackagesRouter);
 app.use("/api/v1/projects", projectsRouter);
 app.use("/api/v1/system", systemRouter);
+// Mounted before `/api/v1/vendor`, which would otherwise take the prefix and
+// leave every invitation path resolving inside the profile router.
+app.use("/api/v1/vendor/invitations", vendorInvitationsRouter);
 app.use("/api/v1/vendor", vendorRouter);
 app.use("/api/v1/vendor-registry", vendorRegistryRouter);
 

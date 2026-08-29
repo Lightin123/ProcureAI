@@ -1,4 +1,5 @@
 import { query } from "../db/pool.js";
+import { toIsoDay } from "./dates.js";
 
 import type { VerificationState } from "./vendorProfiles.js";
 
@@ -40,9 +41,7 @@ const SELECT_DOCUMENT = `
   FROM vendor_documents
 `;
 
-function isoDate(value: Date | null): string | null {
-  return value === null ? null : value.toISOString().slice(0, 10);
-}
+const isoDate = toIsoDay;
 
 function toDocument(row: DocumentRow): VendorDocument {
   return {

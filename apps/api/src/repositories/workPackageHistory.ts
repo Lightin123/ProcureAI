@@ -11,7 +11,16 @@ export type WorkPackageHistoryAction =
   | "RESTORED"
   | "DUPLICATED"
   | "REORDERED"
-  | "CONFIRMED";
+  | "CONFIRMED"
+  // Milestone 7. Shortlisting and invitation are decisions taken against a work
+  // package, so they are audited in the work package's own history rather than
+  // in a parallel table nobody would think to read (D73).
+  | "SHORTLISTED"
+  | "SHORTLIST_REMOVED"
+  | "INVITED"
+  | "INVITATION_WITHDRAWN"
+  | "INVITATION_ACCEPTED"
+  | "INVITATION_DECLINED";
 
 export interface WorkPackageHistoryEntry {
   id: string;

@@ -19,6 +19,19 @@ import { ApiError } from "../middleware/errors.js";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
+/**
+ * The directories this module will write into and read back from.
+ *
+ * An allowlist rather than a free-form path: the folder decides where a file
+ * lands, and a caller that could name an arbitrary one could name a path
+ * outside the upload root. Vendor compliance documents and vendor response
+ * attachments are separate because they have different owners and different
+ * lifetimes — a response attachment is deleted with its response.
+ */
+const UPLOAD_FOLDERS = ["vendor-documents", "response-documents"] as const;
+
+export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
+
 const ALLOWED_MIME_TYPES: Readonly<Record<string, string>> = {
   "application/pdf": "pdf",
   "image/jpeg": "jpg",
@@ -52,7 +65,9 @@ export interface StoredFile {
 export async function storeDocument(input: {
   base64: string;
   mimeType: string;
+  folder?: UploadFolder;
 }): Promise<StoredFile> {
+  const folder: UploadFolder = input.folder ?? "vendor-documents";
   const extension = ALLOWED_MIME_TYPES[input.mimeType];
   if (extension === undefined) {
     throw new ApiError(
@@ -93,10 +108,10 @@ export async function storeDocument(input: {
     );
   }
 
-  const directory = path.join(uploadRoot(), "vendor-documents");
+  const directory = path.join(uploadRoot(), folder);
   await mkdir(directory, { recursive: true });
 
-  const storageKey = `vendor-documents/${randomUUID()}.${extension}`;
+  const storageKey = `${folder}/${randomUUID()}.${extension}`;
   await writeFile(path.join(uploadRoot(), storageKey), bytes);
 
   return { storageKey, sizeBytes: bytes.length };
@@ -126,7 +141,11 @@ function resolveStorageKey(storageKey: string): string {
   const root = uploadRoot();
   const resolved = path.resolve(root, storageKey);
 
-  if (!resolved.startsWith(path.join(root, "vendor-documents") + path.sep)) {
+  const permitted = UPLOAD_FOLDERS.some((folder) =>
+    resolved.startsWith(path.join(root, folder) + path.sep),
+  );
+
+  if (!permitted) {
     throw new ApiError(404, "NOT_FOUND", "The document was not found.");
   }
 

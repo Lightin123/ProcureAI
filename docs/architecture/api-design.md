@@ -200,6 +200,107 @@ route reads a vendor id, an organization id or a profile id from the request;
 an invitation id is the only thing the browser supplies, and it is only ever
 used as half of a predicate whose other half is the session's own profile.
 
+### Response configuration and workspace (Milestone 8)
+
+Mounted at `/api/v1/work-packages/:workPackageId/responses`. Every route
+resolves the work package through the caller's organization before doing
+anything else, so cross-department access fails by omission.
+
+- `GET .../responses/schema` — the section catalogue, the four response types,
+  the answer types and the compliance positions. Served rather than duplicated
+  in the frontend (D58/D79), so a section an official can switch on is exactly
+  a section the server validates and the supplier is shown.
+- `GET .../responses` — the workspace: the configuration and its questions,
+  the confirmed requirements, every response with its vendor, type, status,
+  submission moment and deadline, the status counts, and the invitations that
+  could still produce a response.
+- `PUT .../responses/config` — creates or replaces the configuration. 409
+  `WORK_PACKAGE_NOT_CONFIRMED` unless the package is confirmed; 409
+  `RESPONSE_ALREADY_SUBMITTED` if a supplier has submitted and the request
+  changes the response type, a section mode or a document switch. The deadline
+  and the instructions stay editable (D78).
+- `POST .../responses/config/open` — `DRAFT -> OPEN`, and notifies every
+  supplier with an `ACCEPTED` invitation, in the same request (D74). Second
+  call returns 409 `RESPONSE_NOT_DRAFT`.
+- `POST .../responses/config/close` — `OPEN -> CLOSED`. Submitted responses
+  are untouched.
+- `POST .../responses/config/questions` and
+  `DELETE .../responses/config/questions/:questionId` — custom questions.
+  Both refuse with 409 `RESPONSE_ALREADY_SUBMITTED` once anything has been
+  submitted.
+- `GET .../responses/:responseId` — the complete submitted response:
+  requirement answers, every section value, custom answers, attachments, the
+  clarification thread, and the same completeness computation the supplier
+  saw. Returns 409 `RESPONSE_NOT_SUBMITTED` while the response is a draft
+  (D83), and 404 for a response id belonging to another department or to
+  another package in the same department.
+- `GET .../responses/:responseId/documents/:documentId/content` — the
+  attachment, always `Content-Disposition: attachment` with
+  `X-Content-Type-Options: nosniff`, and never resolvable for a draft.
+- `POST .../responses/:responseId/review` — `SUBMITTED | RESUBMITTED ->
+  UNDER_REVIEW`; 409 `RESPONSE_NOT_REVIEWABLE` otherwise.
+- `POST .../responses/:responseId/ready` — `UNDER_REVIEW ->
+  READY_FOR_EVALUATION`; 409 `RESPONSE_NOT_UNDER_REVIEW` otherwise. Records
+  that the response is complete enough to be assessed; it is not a score, a
+  rank or an award.
+- `POST .../responses/:responseId/clarifications` — records the question and
+  moves the response to `CLARIFICATION_REQUESTED`, reopening it for the
+  supplier.
+- `POST .../responses/:responseId/clarifications/:clarificationId/answer` —
+  answers a question the **supplier** raised. 409
+  `CLARIFICATION_NOT_ANSWERABLE` for one the department raised itself or one
+  already answered (D82).
+
+### Supplier-facing responses (Milestone 8)
+
+Mounted at `/api/v1/vendor/responses`, **before** `/api/v1/vendor`, and a
+deliberately separate router from the government one (D76/D85). The supplier
+profile is resolved from the session on every request and applied in SQL; a
+response id is the only thing the browser supplies.
+
+- `GET /api/v1/vendor/responses` — every response addressed to this supplier.
+- `POST /api/v1/vendor/responses` — body `{ invitationId }`. Opens the draft,
+  or resumes the one already open against that invitation — idempotent, so a
+  supplier pressing the button twice resumes rather than duplicating. Refusals
+  are specific: 404 for an invitation that is not this supplier's, 409
+  `INVITATION_NOT_ACCEPTED`, 409 `RESPONSE_NOT_CONFIGURED`, 409
+  `RESPONSE_NOT_OPEN`.
+- `GET /api/v1/vendor/responses/:responseId` — the whole workspace: the terms,
+  the section catalogue, the confirmed requirements, the supplier's own draft
+  and answers, its attachments, the clarification thread, and the server's
+  completeness computation.
+- `PATCH /api/v1/vendor/responses/:responseId` — saves part of a draft. Keys
+  are looked up in the field catalogue and refused if absent, so no request
+  can name a column. 409 `RESPONSE_NOT_EDITABLE` outside `DRAFT` and
+  `CLARIFICATION_REQUESTED`; 409 `RESPONSE_CLOSED` where the department has
+  closed collection.
+- `PUT .../responses/:responseId/requirements/:requirementId` and
+  `PUT .../responses/:responseId/questions/:questionId` — one requirement
+  answer and one custom answer. Both resolve the target through the response's
+  own work package or configuration inside the write, so an id from elsewhere
+  matches nothing. A custom answer is checked against the shape its question
+  declared.
+- `POST .../responses/:responseId/documents`,
+  `DELETE .../responses/:responseId/documents/:documentId`,
+  `GET .../responses/:responseId/documents/:documentId/content` — attachments.
+  Uploads arrive base64-encoded in the JSON body (D59) and go through the one
+  storage module; 409 `DOCUMENTS_NOT_ACCEPTED` where the department disallowed
+  them.
+- `POST .../responses/:responseId/submit` — validates everything mandatory
+  server-side from the department's stored configuration and refuses with 400
+  `RESPONSE_INCOMPLETE` and the list of missing items. 409
+  `RESPONSE_DEADLINE_PASSED` after the stated day, unless the department has
+  asked for a clarification. 400 `CLARIFICATION_UNANSWERED` while a
+  departmental question is outstanding. `DRAFT -> SUBMITTED` or
+  `CLARIFICATION_REQUESTED -> RESUBMITTED`, decided by the statement itself.
+- `POST .../responses/:responseId/withdraw` — reason required. Not a delete;
+  409 `RESPONSE_NOT_WITHDRAWABLE` once ready for evaluation.
+- `POST .../responses/:responseId/clarifications` — asks the department a
+  question; 409 `CLARIFICATIONS_NOT_ALLOWED` where the department disallowed
+  them, read from the configuration inside the write.
+- `POST .../responses/:responseId/clarifications/:clarificationId/answer` —
+  answers a question the **department** raised.
+
 ### Supplier notifications (extended in Milestone 7)
 
 - `GET /api/v1/vendor/notifications` — the caller's own notifications.
@@ -252,16 +353,45 @@ Permissions required by the implemented endpoints:
 | `GET /api/v1/vendor/invitations` | `vendor:invitation:read` |
 | `GET /api/v1/vendor/invitations/:invitationId` | `vendor:invitation:read` |
 | `POST /api/v1/vendor/invitations/:invitationId/respond` | `vendor:invitation:respond` |
+| `GET .../responses/schema` | `response:read` |
+| `GET .../responses` | `response:read` |
+| `GET .../responses/:responseId` | `response:read` |
+| `GET .../responses/:responseId/documents/:documentId/content` | `response:read` |
+| `PUT .../responses/config` | `response:configure` |
+| `POST .../responses/config/open` | `response:configure` |
+| `POST .../responses/config/close` | `response:configure` |
+| `POST .../responses/config/questions` | `response:configure` |
+| `DELETE .../responses/config/questions/:questionId` | `response:configure` |
+| `POST .../responses/:responseId/review` | `response:manage` |
+| `POST .../responses/:responseId/ready` | `response:manage` |
+| `POST .../responses/:responseId/clarifications` | `response:manage` |
+| `POST .../responses/:responseId/clarifications/:clarificationId/answer` | `response:manage` |
+| `GET /api/v1/vendor/responses` | `vendor:response:read` |
+| `GET /api/v1/vendor/responses/:responseId` | `vendor:response:read` |
+| `GET /api/v1/vendor/responses/:responseId/documents/:documentId/content` | `vendor:response:read` |
+| `POST /api/v1/vendor/responses` | `vendor:response:submit` |
+| `PATCH /api/v1/vendor/responses/:responseId` | `vendor:response:submit` |
+| `PUT /api/v1/vendor/responses/:responseId/requirements/:requirementId` | `vendor:response:submit` |
+| `PUT /api/v1/vendor/responses/:responseId/questions/:questionId` | `vendor:response:submit` |
+| `POST /api/v1/vendor/responses/:responseId/documents` | `vendor:response:submit` |
+| `DELETE /api/v1/vendor/responses/:responseId/documents/:documentId` | `vendor:response:submit` |
+| `POST /api/v1/vendor/responses/:responseId/submit` | `vendor:response:submit` |
+| `POST /api/v1/vendor/responses/:responseId/withdraw` | `vendor:response:submit` |
+| `POST /api/v1/vendor/responses/:responseId/clarifications` | `vendor:response:submit` |
+| `POST /api/v1/vendor/responses/:responseId/clarifications/:clarificationId/answer` | `vendor:response:submit` |
 | `GET /api/v1/vendor/notifications/summary` | `vendor:profile:read` |
 | `POST /api/v1/vendor/notifications/:notificationId/read` | `vendor:profile:manage` |
 
-`vendor:matching:read` is held by Government Officials and Administrators;
-`vendor:shortlist:manage` and `vendor:invitation:manage` by Government
+`vendor:matching:read` and `response:read` are held by Government Officials
+and Administrators; `vendor:shortlist:manage`, `vendor:invitation:manage`,
+`response:configure` and `response:manage` by Government
 Officials **only** — shortlisting and inviting are procurement acts and
 Administrators are oversight-only (D48/D60). `vendor:invitation:read` and
-`vendor:invitation:respond` are held by Vendors **only**, so the side that
-issued an invitation cannot answer it and the side that answers it cannot see
-how it was selected. No role holds both halves.
+`vendor:invitation:respond`, `vendor:response:read` and
+`vendor:response:submit` are held by Vendors **only**, so the side that issued
+an invitation cannot answer it or write the response to it, and the side that
+answers cannot see how it was selected or how its response is being reviewed.
+No role holds both halves.
 
 Organization scoping is unchanged and remains authoritative: the organization
 comes from the session, never from the request, and a project — or a work

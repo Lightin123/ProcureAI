@@ -30,3 +30,20 @@ export function toIsoDay(value: Date | string | null | undefined): string | null
 
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Today, as the calendar day it is here.
+ *
+ * Deadlines are `date` columns and are compared against the day an official or
+ * a supplier is actually living in, not against a UTC instant. Building it from
+ * the local calendar fields is the same rule `toIsoDay` applies in the opposite
+ * direction, and for the same reason (D77).
+ */
+export function todayIsoDay(): string {
+  return toIsoDay(new Date()) ?? "";
+}
+
+/** Whether an ISO day has already gone by. A null deadline never passes. */
+export function dayHasPassed(isoDay: string | null): boolean {
+  return isoDay !== null && isoDay < todayIsoDay();
+}

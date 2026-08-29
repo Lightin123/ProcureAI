@@ -277,13 +277,26 @@ export function WorkPackageVendorMatchingPage() {
             : `${workPackage.packageNumber} — ${workPackage.title}`
         }
         action={
-          <button
-            type="button"
-            className="gov-btn gov-btn--secondary"
-            onClick={() => navigate(`/projects/${projectId}/work-packages`)}
-          >
-            Back to work packages
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {/* Milestone 8 follows an accepted invitation: what the department
+                asks the invited suppliers for, and what they send back. */}
+            <button
+              type="button"
+              className="gov-btn gov-btn--primary"
+              onClick={() =>
+                navigate(`/projects/${projectId}/work-packages/${packageId}/responses`)
+              }
+            >
+              Supplier responses
+            </button>
+            <button
+              type="button"
+              className="gov-btn gov-btn--secondary"
+              onClick={() => navigate(`/projects/${projectId}/work-packages`)}
+            >
+              Back to work packages
+            </button>
+          </div>
         }
       />
 

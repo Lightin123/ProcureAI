@@ -121,6 +121,55 @@ shortlist itself already refused any supplier the eligibility gate excluded,
 so "an ineligible supplier cannot be invited" holds transitively through one
 definition of the gate rather than through a second copy that could drift.
 
+### The two sides of a response (Milestone 8)
+
+A response carries more that must not cross the boundary than an invitation
+does — a supplier's price, its execution plan and its unfinished draft — so the
+same three measures are applied and two more are added.
+
+1. **Different permissions, held by disjoint roles** (D85).
+   `response:configure` and `response:manage` are `GOVERNMENT_OFFICIAL` only;
+   `response:read` is held by `GOVERNMENT_OFFICIAL` and `ADMIN`;
+   `vendor:response:read` and `vendor:response:submit` are `VENDOR` only. No
+   role holds a permission from both sides, so the routes that draft, submit
+   and withdraw a response cannot be reached by the side that will read it,
+   and the routes that review it cannot be reached by the side that wrote it.
+
+2. **Different queries, in different routers.** `routes/vendorResponses.ts`
+   and `routes/workPackageResponses.ts` share no handler, and the vendor-side
+   SELECTs never join the reviewing official, never count the other suppliers,
+   and carry no assessment of any kind. There is nothing to strip because the
+   columns were never selected.
+
+3. **Ownership applied in the predicate.** Every supplier-facing statement
+   carries `vendor_profile_id = $n`; every government-facing statement carries
+   `organization_id = $n`. Writes that also depend on state carry both in one
+   statement — `WHERE id = $1 AND vendor_profile_id = $2 AND status IN
+   ('DRAFT','CLARIFICATION_REQUESTED')` — so "this response is mine" and "this
+   response is still editable" are checked and acted on without a window
+   between them (D81). Requirement answers, question answers and document
+   rows are written through an `INSERT ... SELECT` over the response for the
+   same reason.
+
+4. **A draft is not readable by the department** (D83). While a response is in
+   `DRAFT`, the government detail route returns 409 `RESPONSE_NOT_SUBMITTED`
+   and the document-content route will not resolve its attachments. The
+   workspace still shows that a draft exists and whose it is, which is the
+   fact an official tracking a deadline actually needs.
+
+5. **Immutability after submission is a predicate, not a UI state.** The
+   editable set is `DRAFT` and `CLARIFICATION_REQUESTED`, and it appears in
+   the `WHERE` clause of every write route — section save, requirement answer,
+   question answer, document upload and delete. A route added later that
+   forgets the check writes nothing rather than writing what it should not.
+
+Two further server-side rules exist because the browser cannot be the place
+they are enforced. Whether a supplier may ask a clarification is read from the
+department's configuration **inside** the insert, so a flag the caller cannot
+see is a flag the caller cannot bypass. And completeness is recomputed from
+stored data at submission time (D80), so a client that reports itself complete
+is refused with the list of what is actually missing.
+
 Frontend routes and navigation entries are filtered by the same permissions,
 but that is a usability measure. Where a screen displays server data, the
 endpoint behind it enforces the same permission — the System Status page is

@@ -22,6 +22,9 @@ export const PERMISSIONS = [
   "vendor:matching:read",
   "vendor:shortlist:manage",
   "vendor:invitation:manage",
+  "response:configure",
+  "response:read",
+  "response:manage",
   "organization:read",
   "system:status:read",
   "user:read",
@@ -33,6 +36,8 @@ export const PERMISSIONS = [
   "vendor:opportunity:engage",
   "vendor:invitation:read",
   "vendor:invitation:respond",
+  "vendor:response:read",
+  "vendor:response:submit",
   "vendor:registry:read",
   "vendor:verification:manage",
   "opportunity:publish",
@@ -64,6 +69,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "vendor:matching:read",
     "vendor:shortlist:manage",
     "vendor:invitation:manage",
+    // Milestone 8. Configuring what a response must contain, and moving a
+    // submitted one through review, are procurement acts: they stay with the
+    // official who is accountable for the decision they lead to.
+    "response:configure",
+    "response:read",
+    "response:manage",
     "organization:read",
     "system:status:read",
     "opportunity:publish",
@@ -76,6 +87,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "requirements:read",
     "workpackage:read",
     "vendor:matching:read",
+    // Oversight reads a collected response as it reads a ranking, and acts on
+    // neither: `response:configure` and `response:manage` are withheld.
+    "response:read",
     "organization:read",
     "system:status:read",
     "user:read",
@@ -94,6 +108,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     // cannot be reached by the side that issued the invitation.
     "vendor:invitation:read",
     "vendor:invitation:respond",
+    // A supplier's own response. Held by no government or oversight role, so
+    // the routes that draft, submit and withdraw a response cannot be reached
+    // by the side that will read it.
+    "vendor:response:read",
+    "vendor:response:submit",
   ],
 };
 

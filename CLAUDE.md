@@ -42,8 +42,9 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1 through 6 are complete, including work-package-level hybrid
-matching. **Milestone 7 (vendor shortlisting and engagement) is complete.**
+Milestones 1 through 7 are complete, including work-package-level hybrid
+matching and vendor engagement. **Milestone 8 (vendor response and proposal
+collection) is complete.**
 Full status: [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md)
 and [docs/development-roadmap.md](docs/development-roadmap.md).
 
@@ -57,7 +58,13 @@ discover published opportunities matched against their profile. For a
 ranked, explainable list of eligible suppliers, can inspect who was excluded
 and on what ground, compare suppliers side by side, shortlist them with a
 recorded reason, and invite the shortlisted ones. The supplier is notified in
-its own portal, opens the invitation, and accepts or declines.
+its own portal, opens the invitation, and accepts or declines. The official
+then configures what response the work package requires, opens it to the
+suppliers that accepted, and tracks what comes back; the supplier drafts that
+response over several sittings, answers each confirmed requirement, attaches
+documents, reviews and submits it. Either side can raise a clarification, and
+the official moves a submitted response through review to
+`READY_FOR_EVALUATION`, where Milestone 9 begins.
 
 **Work-package vendor matching (`apps/api/src/matching/`).** Five stages, in
 separate modules, which must not be merged (D63):
@@ -139,6 +146,50 @@ Rules when touching this area:
   `repositories/dates.ts`, never with `toISOString().slice(0, 10)`, which
   shifts the day backwards at IST (D77).
 
+**Vendor responses (`work_package_responses`, Milestone 8).** The accepted
+invitation from Milestone 7 is the seam the response is built on, and it was
+not changed:
+
+    accepted invitation
+      -> response configuration   (work_package_response_configs)  — one per package
+      -> custom questions         (work_package_response_questions)
+      -> vendor draft             (work_package_responses)         — resumable
+      -> requirement answers      (..._requirement_answers)        — one per requirement
+      -> question answers         (..._question_answers)
+      -> documents                (..._documents)                  — reuses documentStorage
+      -> clarifications           (..._clarifications)             — both directions
+      -> DRAFT -> SUBMITTED -> UNDER_REVIEW -> READY_FOR_EVALUATION
+
+Rules when touching this area:
+
+- What is being asked for is **one configuration per work package**, not per
+  supplier, and it freezes once any supplier has submitted (D78). The deadline
+  and the instructions stay editable; the response type and the section modes
+  do not.
+- The section catalogue lives in `src/responses/schema.ts` and is **served**
+  to the frontend (D79). Never write a second copy of it in `apps/web`, and
+  never add a section without adding its column.
+- Completeness is computed by one function, `responses/completeness.ts`, used
+  by both the progress indicator and the submission gate (D80). A submission
+  check that does not go through it will drift from what the supplier is shown.
+- Every state transition is a conditional `UPDATE` carrying the ownership
+  predicate and the permitted source states (D81). Editability is exactly
+  `DRAFT` and `CLARIFICATION_REQUESTED`; do not add a handler-level check
+  instead. There is no `EXPIRED` state and no background job — a passed
+  deadline is derived at read time and enforced at submission.
+- A department **cannot read an unsubmitted draft** (D83). Do not relax this
+  to "show the official what has been typed so far".
+- Clarifications are one table for both directions; `raised_by_side` decides
+  who may answer, in SQL (D82). Neither the question nor the answer is
+  editable.
+- Response attachments are their own table but the bytes go through
+  `vendor/documentStorage.ts` (D84). Do not add a second upload path.
+- Every vendor-facing lookup takes `vendorProfileId` from the session and
+  applies it in the `WHERE` clause. The two sides are different queries in
+  different routers (D76, D85) — do not merge them behind a role flag.
+- Nothing in this milestone scores, ranks or recommends a response.
+  `READY_FOR_EVALUATION` is where Milestone 8 stops.
+
 **Authentication and RBAC are implemented (Milestone 5).** When touching the
 API, the rules are:
 
@@ -159,11 +210,13 @@ See [docs/engineering/security.md](docs/engineering/security.md) and
 [docs/product/users-and-roles.md](docs/product/users-and-roles.md).
 
 **Do not implement** until explicitly requested:
-- RFI/proposal collection, document intelligence, response evaluation —
-  Milestones 8–9. Milestone 7 stops at an accepted invitation: accepting
-  registers an intent to respond and is not a proposal, a quotation or an
-  award. Do not build a response form, a submission entity, deadline
-  enforcement or evaluation scoring on top of it.
+- Proposal scoring, vendor ranking of responses, AI evaluation of a
+  submission, compliance scoring, automatic vendor selection, final
+  procurement decision recording, document intelligence — Milestone 9.
+  Milestone 8 stops at `READY_FOR_EVALUATION`: that state records that a
+  response is complete enough to be assessed, and is not an assessment, a
+  score, a rank or an award. Do not build an evaluation entity, a scoring
+  column or a comparison ranking on top of it.
 - Vendor gap analysis, procurement analytics — Milestone 10
 - Advanced semantic optimization (learned ranking, query expansion,
   reranking) — Milestone 11

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiRequestError } from "../api/client.js";
 import {
@@ -7,6 +7,7 @@ import {
   respondToInvitation,
   type VendorInvitation,
 } from "../api/vendorInvitations.js";
+import { openVendorResponse } from "../api/vendorResponses.js";
 import { Breadcrumb } from "../components/Breadcrumb.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
 import { GovernmentCard } from "../components/GovernmentCard.js";
@@ -24,13 +25,15 @@ import { INVITATION_BADGE, deadlineNote, formatDay } from "./VendorInvitationsPa
  * score, no comparison, no other supplier. The API does not serve those to this
  * side, and the page does not ask for them.
  *
- * Accepting registers a willingness to respond. It is not a proposal, a
- * quotation or a commitment to supply — the structured response is Milestone 8.
+ * Accepting registers a willingness to respond. It is not itself a proposal, a
+ * quotation or a commitment to supply: what follows an acceptance is the
+ * structured response, which the department opens and this page links into.
  */
 
 export function VendorInvitationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const invitationId = id ?? "";
+  const navigate = useNavigate();
 
   const [invitation, setInvitation] = React.useState<VendorInvitation>();
   const [error, setError] = React.useState<string>();
@@ -97,8 +100,33 @@ export function VendorInvitationDetailPage() {
     }
   }
 
+  /**
+   * Opens the structured response, or resumes the draft already open against
+   * this invitation. The server is idempotent, so pressing this twice resumes
+   * rather than duplicates.
+   */
+  async function startResponse(): Promise<void> {
+    setBusy(true);
+    setError(undefined);
+
+    try {
+      const workspace = await openVendorResponse(invitationId);
+      await navigate(`/vendor/responses/${workspace.response.id}`);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiRequestError
+          ? caught.message
+          : "The response could not be opened.",
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const open = invitation?.status === "INVITED";
   const badge = invitation === undefined ? undefined : INVITATION_BADGE[invitation.status];
+  const responseState = invitation?.response;
 
   return (
     <>
@@ -290,6 +318,67 @@ export function VendorInvitationDetailPage() {
               </>
             )}
           </GovernmentCard>
+
+          {/* ---- The structured response (Milestone 8) -------------------- */}
+          {invitation.status === "ACCEPTED" && responseState !== undefined && (
+            <GovernmentCard
+              title="Your structured response"
+              subtitle="What the department has asked your organisation to submit for this work package"
+            >
+              {responseState.responseId !== null ? (
+                <>
+                  <p style={{ marginTop: 0, fontSize: "14px" }}>
+                    A response has been started for this invitation
+                    {responseState.responseType === null
+                      ? ""
+                      : ` as ${responseState.responseType.replace(/_/g, " ").toLowerCase()}`}
+                    .{" "}
+                    {responseState.responseDeadline === null
+                      ? "No response date was stated."
+                      : `Responses are due by ${formatDay(responseState.responseDeadline)}.`}
+                  </p>
+                  <div className="gov-form-actions">
+                    <Link
+                      className="gov-btn gov-btn--primary"
+                      to={`/vendor/responses/${responseState.responseId}`}
+                    >
+                      Open your response
+                    </Link>
+                  </div>
+                </>
+              ) : responseState.open ? (
+                <>
+                  <p style={{ marginTop: 0, fontSize: "14px" }}>
+                    {invitation.departmentName} has asked for
+                    {responseState.responseType === null
+                      ? " a response"
+                      : ` ${responseState.responseType.replace(/_/g, " ").toLowerCase()}`}
+                    .{" "}
+                    {responseState.responseDeadline === null
+                      ? "No response date was stated."
+                      : `Responses are due by ${formatDay(responseState.responseDeadline)}.`}{" "}
+                    Your draft is saved as you go and you can return to it at any time.
+                  </p>
+                  <div className="gov-form-actions">
+                    <button
+                      type="button"
+                      className="gov-btn gov-btn--primary"
+                      disabled={busy}
+                      onClick={() => void startResponse()}
+                    >
+                      Start your response
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: "14px" }}>
+                  {responseState.configured
+                    ? "The department has prepared a response for this work package but has not opened it yet. You will be notified in this portal when it does."
+                    : "The department has not yet asked for a structured response to this work package. You will be notified in this portal when it does."}
+                </p>
+              )}
+            </GovernmentCard>
+          )}
 
           {open && (
             <GovernmentCard

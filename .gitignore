@@ -19,5 +19,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Vendor compliance documents. Runtime-uploaded user content, never source.
+# Vendor compliance documents and vendor response attachments.
+# Runtime-uploaded user content, never source.
 apps/api/var/uploads/

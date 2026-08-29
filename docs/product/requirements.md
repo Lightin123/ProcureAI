@@ -193,9 +193,9 @@ later stage requires it.
 
 ## Current Milestone Scope
 
-Milestones 1 through 5 are implemented, and Milestone 6 is in progress —
-see [../development-roadmap.md](../development-roadmap.md) for full detail
-on what "in progress" covers. Against the functional requirements above:
+Milestones 1 through 8 are implemented — see
+[../development-roadmap.md](../development-roadmap.md) for full detail.
+Against the functional requirements above:
 
 | Requirement | Status |
 |---|---|
@@ -212,13 +212,14 @@ on what "in progress" covers. Against the functional requirements above:
 | FR4.1 — semantic, work-package-level vendor discovery | Implemented. Hybrid retrieval — pgvector cosine over capability embeddings, unioned with lexical keyword overlap — scoped to a confirmed work package; degrades to lexical-only where pgvector is absent |
 | FR4.2 — structured filtering as a deterministic eligibility gate | Implemented as a distinct hard gate running before ranking, never as a score: profile assessability, verification not rejected, mandatory certifications, credential validity, delivery region, contract value ceiling |
 | FR4.3 — official reviews/adjusts the candidate vendor list | Implemented: ranked cards with per-dimension scores, inspectable exclusions, side-by-side comparison, shortlisting, recalculation |
-| FR5 — RFI / proposal collection | Not implemented |
+| FR4.4 — invite and engage shortlisted suppliers | Implemented (Milestone 7): shortlist with a recorded reason, invitation with instructions and a response date, in-portal notification, and the supplier's acceptance or reasoned decline |
+| FR5.1 — collect RFI responses or proposal documents for a work package | Implemented (Milestone 8). The official configures what is required — expression of interest, RFI, proposal or quotation — with a deadline, required and optional sections, custom questions, and whether clarifications and documents are allowed. The invited supplier drafts a resumable response, answers each confirmed requirement individually, attaches documents, and submits it against server-side validation of everything mandatory. Clarifications run in both directions with their actors and timestamps preserved, and the official tracks each response through review to `READY_FOR_EVALUATION` |
 | FR6 — document intelligence | Not implemented |
-| FR7 — evaluation | Not implemented (this is response evaluation; see Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md), distinct from the vendor-ranking work in FR4) |
+| FR7 — evaluation | Not implemented (this is response evaluation; see Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md), distinct from the vendor-ranking work in FR4). Milestone 8 collects and organises the responses it will read, and deliberately produces no score, rank or comparison of its own |
 | FR8 — ranking and recommendation | Deferred as specified (this is ranking of evaluated *responses*, and FR8.4 combination recommendation, both Milestone 9+). The ranking of discovered *candidates* that FR4 needs is implemented: seven deterministic weighted dimensions per work package, each individually inspectable, every recommendation carrying its evidence |
 | FR9 — human review and decision | Implemented for every AI-generated suggestion built so far (requirements, work packages); FR9.2 (recording a final procurement decision) awaits Milestone 9 |
 | FR10 — access control | Implemented (Milestone 5): three roles, permission-based authorization, organization scoping enforced on every query |
-| FR11.1 — auditability of key actions | Implemented for requirement and work-package decisions, stage transitions, and vendor verification decisions. A general-purpose audit log across all data areas does not exist |
+| FR11.1 — auditability of key actions | Implemented for requirement and work-package decisions, stage transitions, vendor verification decisions, shortlist and invitation acts, and every response lifecycle event — each with its actor, moment and, where one is required, its stated reason. A supplier's own acts are attributed to the supplier's user. A general-purpose audit log across all data areas does not exist |
 
 Against the non-functional requirements: **NFR1** is met for requirement
 analysis, work package generation, and vendor matching — every suggestion

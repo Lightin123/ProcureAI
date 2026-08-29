@@ -7,6 +7,7 @@ export interface VendorNotification {
   body: string;
   linkPath: string | null;
   invitationId: string | null;
+  responseId: string | null;
   readAt: string | null;
   createdAt: string;
 }
@@ -17,7 +18,11 @@ export type NotificationCategory =
   | "VERIFICATION"
   | "DOCUMENT"
   | "OPPORTUNITY"
-  | "INVITATION";
+  | "INVITATION"
+  // Milestone 8. Everything a supplier is told about the response it owes, is
+  // drafting or has submitted. Reuses this table rather than adding a second
+  // notification system (D74).
+  | "RESPONSE";
 
 export async function listNotifications(
   profileId: string,
@@ -30,10 +35,11 @@ export async function listNotifications(
     body: string;
     link_path: string | null;
     invitation_id: string | null;
+    response_id: string | null;
     read_at: Date | null;
     created_at: Date;
   }>(
-    `SELECT id, category, title, body, link_path, invitation_id, read_at, created_at
+    `SELECT id, category, title, body, link_path, invitation_id, response_id, read_at, created_at
      FROM vendor_notifications
      WHERE vendor_profile_id = $1
      ORDER BY created_at DESC
@@ -48,6 +54,7 @@ export async function listNotifications(
     body: row.body,
     linkPath: row.link_path,
     invitationId: row.invitation_id,
+    responseId: row.response_id,
     readAt: row.read_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
   }));
@@ -60,11 +67,12 @@ export async function createNotification(input: {
   body: string;
   linkPath?: string | undefined;
   invitationId?: string | undefined;
+  responseId?: string | undefined;
 }): Promise<void> {
   await query(
     `INSERT INTO vendor_notifications
-       (vendor_profile_id, category, title, body, link_path, invitation_id)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+       (vendor_profile_id, category, title, body, link_path, invitation_id, response_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       input.profileId,
       input.category,
@@ -72,6 +80,7 @@ export async function createNotification(input: {
       input.body,
       input.linkPath ?? null,
       input.invitationId ?? null,
+      input.responseId ?? null,
     ],
   );
 }

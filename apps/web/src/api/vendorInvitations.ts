@@ -37,6 +37,26 @@ export interface VendorInvitation {
   packageComplexity: string;
   packagePriority: string;
   deliverables: string[];
+
+  /**
+   * Milestone 8. What the department has asked for by way of a structured
+   * response, and how far this supplier has got with it.
+   *
+   * Carried on the invitation because the invitation is where the supplier
+   * looks next. It says what is being asked of this supplier and nothing about
+   * how it was assessed or about any other supplier.
+   */
+  response: VendorInvitationResponseState;
+}
+
+export interface VendorInvitationResponseState {
+  configured: boolean;
+  open: boolean;
+  responseType: string | null;
+  responseDeadline: string | null;
+  deadlinePassed: boolean;
+  responseId: string | null;
+  responseStatus: string | null;
 }
 
 const BASE = "/api/v1/vendor/invitations";

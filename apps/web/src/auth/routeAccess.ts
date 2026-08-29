@@ -14,6 +14,7 @@ export const ROUTE_PERMISSION = {
   vendor: "vendor:profile:read",
   vendorOpportunities: "vendor:opportunity:read",
   vendorInvitations: "vendor:invitation:read",
+  vendorResponses: "vendor:response:read",
   vendorRegistry: "vendor:registry:read",
   status: "system:status:read",
 } as const;
@@ -28,6 +29,7 @@ const PATH_RULES: ReadonlyArray<readonly [string, string]> = [
   ["/projects", ROUTE_PERMISSION.projects],
   ["/vendor/opportunities", ROUTE_PERMISSION.vendorOpportunities],
   ["/vendor/invitations", ROUTE_PERMISSION.vendorInvitations],
+  ["/vendor/responses", ROUTE_PERMISSION.vendorResponses],
   ["/vendor", ROUTE_PERMISSION.vendor],
   ["/admin/suppliers", ROUTE_PERMISSION.vendorRegistry],
   ["/status", ROUTE_PERMISSION.status],
@@ -114,6 +116,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Invitations",
     permission: ROUTE_PERMISSION.vendorInvitations,
     matchPrefix: "/vendor/invitations",
+  },
+  {
+    to: "/vendor/responses",
+    label: "My Responses",
+    permission: ROUTE_PERMISSION.vendorResponses,
+    matchPrefix: "/vendor/responses",
   },
   {
     to: "/vendor/profile",

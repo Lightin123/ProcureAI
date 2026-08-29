@@ -394,12 +394,130 @@ the shortlist seam (D69) and the notification table were already there.
   on the unread predicate (`WHERE read_at IS NULL`) backs the header badge,
   which is counted on every page load of the supplier portal.
 
-No table was added for the supplier's response: the response *is* the
-invitation's `status`, `responded_by`, `responded_at` and `response_note`. A
-separate `invitation_responses` table would model a one-to-one relationship
-as one-to-many and invite a second, contradictory answer to exist. The
-structured proposal that Milestone 8 collects is a genuinely different
-entity and will get its own table then.
+No table was added for the supplier's *answer to the invitation*: that answer
+*is* the invitation's `status`, `responded_by`, `responded_at` and
+`response_note`. A separate `invitation_responses` table would model a
+one-to-one relationship as one-to-many and invite a second, contradictory
+answer to exist. The structured proposal is a genuinely different entity and
+got its own tables in Milestone 8, below.
+
+## Vendor Responses (Milestone 8)
+
+Added by `apps/api/migrations/009_vendor_responses.sql`. Six new tables, seven
+new enums, eleven new labels on `work_package_history_action`, and one
+nullable column on `vendor_notifications`. The accepted invitation from
+Milestone 7 is the seam and was not changed.
+
+- `work_package_response_configs` — what the department is asking every
+  invited supplier for, **one row per work package** (unique on
+  `work_package_id`). Carries `response_type`
+  (`EXPRESSION_OF_INTEREST` / `RFI` / `PROPOSAL` / `QUOTATION`), `status`
+  (`DRAFT` / `OPEN` / `CLOSED`), `title`, `instructions`, `response_deadline`,
+  a `sections` jsonb map of section id to `OFF` / `OPTIONAL` / `REQUIRED`,
+  `allow_clarifications`, `allow_documents`, `documents_required`, and the
+  actor and moment of configuring, opening and closing. CHECK constraints keep
+  the lifecycle honest — an `OPEN` or `CLOSED` row carries `opened_at`, a
+  `CLOSED` row carries `closed_at` — and documents cannot be mandatory where
+  they are not permitted. One configuration per package rather than per
+  supplier, because responses compared side by side have to be the same
+  response (D78). `sections` is jsonb validated against the catalogue in
+  `apps/api/src/responses/schema.ts` rather than a column per section, since
+  adding a section should be a list entry and no query filters on one
+  section's mode (D79).
+
+- `work_package_response_questions` — the department's own questions, over and
+  above the standard sections, attached to the **configuration** so every
+  supplier is asked the same thing. `section` (validated against the same
+  catalogue), `prompt`, `help_text`, `answer_type`, `options` jsonb,
+  `is_required`, `display_order`. A CHECK enforces that the two choice types
+  carry options and the other five do not, which is the same rule the API
+  states in a message.
+
+- `work_package_responses` — the response itself, **one per invitation**
+  (unique on `invitation_id`), not one per (work package, supplier): a
+  supplier re-invited after a withdrawal is answering a fresh invitation, and
+  its answer to the previous one stays on the record. Carries `config_id`,
+  `work_package_id`, `project_id`, `vendor_profile_id`, `organization_id` (the
+  issuing department, denormalised as the invitation denormalises it),
+  `status`, and the section values as **explicit nullable columns** —
+  `summary`, `technical_approach`, `technical_standards`, `execution_plan`,
+  `team_composition`, `timeline_summary`, `estimated_duration_weeks`,
+  `proposed_start_date`, `capacity_statement`, `committed_team_size`,
+  `experience_summary`, `compliance_statement`, `compliance_confirmed`,
+  `commercial_summary`, `quoted_value_inr`, `price_validity_days`,
+  `payment_terms`, `taxes_included` — plus `submitted_at` / `submitted_by` /
+  `submission_count`, `review_started_at` / `_by`, `readied_at` / `_by`, and
+  `withdrawn_at` / `_by` / `withdrawal_reason`.
+
+  Columns rather than a jsonb blob because a quoted value, a start date and a
+  team size are facts the department reads and sorts on, and Milestone 9 will
+  compare (D79). Each is nullable because whether it is *required* belongs to
+  the configuration, not to the schema. CHECK constraints keep the numbers
+  positive and the lifecycle honest: a row that has left `DRAFT` carries
+  `submitted_at` and a non-zero `submission_count`, a `WITHDRAWN` row carries
+  `withdrawn_at`, and a `READY_FOR_EVALUATION` row carries `readied_at`.
+  Indexed on `(work_package_id, updated_at DESC)` for the department's
+  workspace, `(vendor_profile_id, updated_at DESC)` for the supplier's own
+  list, and `(organization_id, status)` for the status counts.
+
+- `work_package_response_status` — `DRAFT`, `SUBMITTED`, `UNDER_REVIEW`,
+  `CLARIFICATION_REQUESTED`, `RESUBMITTED`, `READY_FOR_EVALUATION`,
+  `WITHDRAWN`. There is no `EXPIRED`, for the reason D75 gave for invitations:
+  a passed deadline is derived at read time and enforced at submission (D81).
+
+- `work_package_response_requirement_answers` — one row per confirmed
+  requirement the supplier answered, unique on `(response_id,
+  requirement_id)`. Holds `compliance` (`MEETS` / `PARTIALLY_MEETS` /
+  `DOES_NOT_MEET` / `NOT_APPLICABLE`), the written `answer`, a `notes` field,
+  and its actor. A table rather than a jsonb map keyed by requirement id,
+  because the foreign key is what stops an answer referring to a requirement
+  that is not on this work package — and because Milestone 9 compares
+  suppliers requirement by requirement.
+
+- `work_package_response_question_answers` — one row per custom question
+  answered, unique on `(response_id, question_id)`. `value` is jsonb because
+  the question's own `answer_type` decides the shape; the API validates the
+  value against that type on write, so the column never holds a shape the
+  question did not ask for.
+
+- `work_package_response_documents` — attachment metadata: `title`,
+  `description`, `file_name`, `mime_type`, `size_bytes`, `storage_key`, actor
+  and moment. Deliberately **not** `vendor_documents`: a compliance document
+  belongs to the supplier's profile, is reviewed by an administrator and is
+  visible to every department that matches against the supplier, whereas a
+  response attachment belongs to one response, is visible to one department,
+  and is deleted with the response (D84). The bytes still go through
+  `apps/api/src/vendor/documentStorage.ts`, which gained an allowlist of
+  upload folders rather than a free-form path.
+
+- `work_package_response_clarifications` — one table for **both directions**.
+  `raised_by_side` (`VENDOR` / `GOVERNMENT`) records which side asked and is
+  what decides which side may answer, enforced in the `UPDATE`'s `WHERE`
+  clause. Holds `subject`, `question`, `asked_by` / `asked_at`, an optional
+  `respond_by` date, and `answer` / `answered_by` / `answered_at`, with a
+  CHECK that `ANSWERED` and an answer imply each other. Neither the question
+  nor the answer is editable, which is what makes the thread a record rather
+  than a pair of mutable fields (D82). A partial index on the open predicate
+  backs the counts both portals show.
+
+- `work_package_history_action` gains `RESPONSE_CONFIGURED`,
+  `RESPONSE_OPENED`, `RESPONSE_CLOSED`, `RESPONSE_SUBMITTED`,
+  `RESPONSE_RESUBMITTED`, `RESPONSE_UNDER_REVIEW`,
+  `RESPONSE_CLARIFICATION_REQUESTED`, `RESPONSE_CLARIFICATION_ASKED`,
+  `RESPONSE_CLARIFICATION_ANSWERED`, `RESPONSE_READY_FOR_EVALUATION` and
+  `RESPONSE_WITHDRAWN` — the same reasoning as D73. A supplier's submission,
+  withdrawal and clarification answer are recorded with the **supplier's**
+  user as `actor_id`.
+
+- `vendor_notifications.response_id` — nullable, cascading, indexed on the
+  non-null predicate. The counterpart of Milestone 7's `invitation_id`, for
+  the same reason: "is this notification about this response" is not a
+  question a URL string answers (D74).
+
+No evaluation table exists. `READY_FOR_EVALUATION` records that a response is
+complete enough to be assessed and nothing more — no score, no rank, no
+comparison. Milestone 9's evaluation entity is deliberately unmodelled until
+that workflow is specified, exactly as the response was through Milestone 7.
 
 ## Embeddings / Vector Search
 

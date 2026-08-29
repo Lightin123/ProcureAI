@@ -1858,3 +1858,39 @@ export async function validateAndConfirmWorkPackages(
     client.release();
   }
 }
+
+/**
+ * The confirmed requirements a supplier is asked to answer, one by one.
+ *
+ * Only accepted requirements: a suggestion an official rejected is not part of
+ * what the department is buying, and asking a supplier to respond to one would
+ * put a discarded requirement in front of it as though it stood.
+ *
+ * Deliberately narrower than `findWorkPackageById`, which loads dependencies,
+ * every version snapshot and the decision trail — none of which a response form
+ * has any use for.
+ */
+export async function listConfirmedRequirementsForPackage(
+  workPackageId: string,
+): Promise<Array<{ id: string; kind: string; category: string; text: string }>> {
+  const result = await query<{
+    id: string;
+    kind: string;
+    category: string;
+    text: string;
+  }>(
+    `SELECT r.id, r.kind::text, r.category::text, r.text
+     FROM work_package_requirements wpr
+     JOIN project_requirements r ON r.id = wpr.requirement_id
+     WHERE wpr.work_package_id = $1 AND r.status = 'ACCEPTED'
+     ORDER BY r.created_at ASC`,
+    [workPackageId],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    category: row.category,
+    text: row.text,
+  }));
+}

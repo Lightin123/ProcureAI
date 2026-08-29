@@ -13,6 +13,8 @@ import { vendorRouter } from "./routes/vendor.js";
 import { vendorInvitationsRouter } from "./routes/vendorInvitations.js";
 import { vendorMatchingRouter } from "./routes/vendorMatching.js";
 import { vendorRegistryRouter } from "./routes/vendorRegistry.js";
+import { vendorResponsesRouter } from "./routes/vendorResponses.js";
+import { workPackageResponsesRouter } from "./routes/workPackageResponses.js";
 import {
   directWorkPackagesRouter,
   projectWorkPackagesRouter,
@@ -29,6 +31,9 @@ app.set("trust proxy", "loopback");
 // one path gets a larger ceiling. Mounted before the global parser, which
 // otherwise rejects the request at 100 kB.
 app.use("/api/v1/vendor/profile/documents", express.json({ limit: "8mb" }));
+// Response attachments arrive the same way and get the same ceiling. The path
+// is matched as a prefix, so it covers every `/:responseId/documents` under it.
+app.use("/api/v1/vendor/responses", express.json({ limit: "8mb" }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -46,12 +51,14 @@ app.use("/api/v1", requireAuth);
 app.use("/api/v1/projects/:projectId/requirements", requirementsRouter);
 app.use("/api/v1/projects/:projectId/work-packages", projectWorkPackagesRouter);
 app.use("/api/v1/work-packages/:workPackageId/vendor-matches", vendorMatchingRouter);
+app.use("/api/v1/work-packages/:workPackageId/responses", workPackageResponsesRouter);
 app.use("/api/v1/work-packages", directWorkPackagesRouter);
 app.use("/api/v1/projects", projectsRouter);
 app.use("/api/v1/system", systemRouter);
 // Mounted before `/api/v1/vendor`, which would otherwise take the prefix and
 // leave every invitation path resolving inside the profile router.
 app.use("/api/v1/vendor/invitations", vendorInvitationsRouter);
+app.use("/api/v1/vendor/responses", vendorResponsesRouter);
 app.use("/api/v1/vendor", vendorRouter);
 app.use("/api/v1/vendor-registry", vendorRegistryRouter);
 

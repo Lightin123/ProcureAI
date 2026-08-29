@@ -20,7 +20,21 @@ export type WorkPackageHistoryAction =
   | "INVITED"
   | "INVITATION_WITHDRAWN"
   | "INVITATION_ACCEPTED"
-  | "INVITATION_DECLINED";
+  | "INVITATION_DECLINED"
+  // Milestone 8. The response a supplier gives is an event in the work
+  // package's own life, so it is audited in the same place as everything else
+  // that happened to the package (D73).
+  | "RESPONSE_CONFIGURED"
+  | "RESPONSE_OPENED"
+  | "RESPONSE_CLOSED"
+  | "RESPONSE_SUBMITTED"
+  | "RESPONSE_RESUBMITTED"
+  | "RESPONSE_UNDER_REVIEW"
+  | "RESPONSE_CLARIFICATION_REQUESTED"
+  | "RESPONSE_CLARIFICATION_ASKED"
+  | "RESPONSE_CLARIFICATION_ANSWERED"
+  | "RESPONSE_READY_FOR_EVALUATION"
+  | "RESPONSE_WITHDRAWN";
 
 export interface WorkPackageHistoryEntry {
   id: string;

@@ -259,6 +259,105 @@ carries the unread count; opening a notification marks that one read and
 navigates to the invitation. There is no email, SMS or push channel — in-portal
 only.
 
+## Response Lifecycle (Implemented, Milestone 8)
+
+Also **work-package-level**, and again introducing **no new project state**.
+It begins where the engagement lifecycle ends, at an accepted invitation, and
+ends at `READY_FOR_EVALUATION`, where Milestone 9 begins.
+
+```
+ACCEPTED invitation
+        |
+        v
+  response configuration              (department: type, deadline, sections,
+        |                              questions, clarification and document
+        |                              switches)
+        |
+    DRAFT (config)  ---> OPEN  ------------------> CLOSED
+                          |  (suppliers notified)
+                          v
+                 supplier opens a response
+                          |
+                          v
+                       DRAFT  <---------------------------+
+                          |                               |
+                       submit  (validated server-side)    | amend
+                          |                               |
+                          v                               |
+                     SUBMITTED                            |
+                          |                               |
+                     open review                          |
+                          |                               |
+                          v                               |
+                    UNDER_REVIEW ---> CLARIFICATION_REQUESTED
+                          |                               |
+                          |                          resubmit
+                          |                               |
+                          |                               v
+                          |<-------------------------  RESUBMITTED
+                          |
+                     mark ready
+                          |
+                          v
+                READY_FOR_EVALUATION            --> Milestone 9
+
+   WITHDRAWN  <--- the supplier, from any state before evaluation
+```
+
+### Rules
+
+- **Nothing advances automatically.** Configuring, opening, closing,
+  submitting, reviewing, clarifying, resubmitting, marking ready and
+  withdrawing are each an explicit act by an identified person.
+- One configuration per **work package**, not per supplier, so the responses
+  can be read side by side. Opening it notifies every supplier that
+  **accepted** its invitation — an unanswered invitation is not asked to
+  respond to something it has not agreed to.
+- Once any supplier has submitted, the response type, the section modes and
+  the document switches are frozen; the deadline and the instructions are not
+  (D78). Changing what is being asked for mid-competition would make an
+  already-submitted response incomplete against terms it never saw.
+- A response is **editable exactly in `DRAFT` and `CLARIFICATION_REQUESTED`**.
+  Submission is validated server-side against the department's own
+  configuration — every required section field, every required requirement
+  answer, every required custom question and a mandatory document if one was
+  demanded — and refused with the list of what is missing (D80).
+- A department **cannot read an unsubmitted draft** (D83). It sees that one
+  exists, and whose it is.
+- **There is no expiry state.** A passed deadline is derived when the response
+  is read and enforced when it is submitted. A response the department itself
+  asked to have clarified is exempt, because refusing a reply the department
+  requested after its own deadline would make its own request unanswerable.
+- **Clarifications run both ways** in one thread. The side that asked cannot
+  answer; neither the question nor the answer is editable (D82). A supplier
+  may only ask where the department allowed it; the department may always ask.
+  A resubmission is refused while a departmental question is unanswered.
+- **Withdrawal is not deletion.** The response, its answers and its
+  attachments stay on the record and the department is shown the stated
+  reason. A response already marked ready for evaluation cannot be withdrawn.
+- `READY_FOR_EVALUATION` records that a response is **complete enough to be
+  assessed**. It is not a score, a rank, a selection or an award.
+
+### What each side sees
+
+The department sees every response on its own work package with the vendor,
+the response type, the status, the submission moment and the deadline; it
+opens a submitted one and reads the requirement answers, every section, the
+custom answers, the attachments and the whole clarification thread. The
+supplier sees only its own response, the terms it was set, the confirmed
+requirements it must answer, its own progress, and the same clarification
+thread — never a reviewing official, another supplier, or any assessment
+(D85). As with invitations, the two views are different queries in different
+routers so that the separation cannot erode by accident.
+
+### Notification
+
+Opening a response, requesting a clarification, answering one, starting a
+review, marking a response ready, and the supplier's own submission and
+withdrawal each write a notification to the supplier's list in the same
+request, in the `RESPONSE` category. The same header bell and unread count
+carry them; there is still no channel outside the portal.
+
 ## Related Documents
 
 - [../product/problem-statement.md](../product/problem-statement.md)

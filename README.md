@@ -6,11 +6,14 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 7 (Vendor Shortlisting and Engagement)
+> **Project status:** Milestone 8 (Vendor Response and Proposal Collection)
 > complete — for a confirmed work package an official gets a ranked,
-> explainable list of eligible suppliers, compares them, shortlists them with
-> a recorded reason, and invites the shortlisted ones. The supplier is
-> notified in its own portal, opens the invitation, and accepts or declines.
+> explainable list of eligible suppliers, shortlists and invites them,
+> configures what response the package requires, and tracks what comes back.
+> The invited supplier drafts a structured response over several sittings,
+> answers each confirmed requirement, attaches documents, reviews and submits
+> it; either side can raise a clarification, and the official moves the
+> submission through review to *ready for evaluation*.
 > See [Current Status](#current-status) below.
 
 ## Problem Statement
@@ -112,7 +115,7 @@ for details and rationale.
 
 ## Current Status
 
-**Milestones 1–6 are complete.**
+**Milestones 1–8 are complete.**
 
 An official signs in, creates a procurement project, runs AI analysis on its
 problem description, reviews the suggested requirements and constraints,
@@ -129,13 +132,14 @@ packages.
 
 - `apps/web` — React + TypeScript + Vite. Sign-in, projects register, project
   detail, create form, requirements review, work packages, supplier matching
-  with comparison, shortlisting and invitation tracking, the vendor portal
-  with its notification bell and invitation pages, the supplier registry, and
-  System Status. Routes and navigation are permission-aware.
+  with comparison, shortlisting and invitation tracking, the response
+  workspace and the full response reader, the vendor portal with its
+  notification bell, invitation pages and the response editor, the supplier
+  registry, and System Status. Routes and navigation are permission-aware.
 - `apps/api` — Express + TypeScript. Authentication, projects, requirement
   analysis, work packages, vendor profiles, work-package supplier matching,
-  and supplier shortlisting, invitation and response, backed by PostgreSQL
-  (with pgvector) via `pg`.
+  supplier shortlisting and invitation, and structured response collection,
+  backed by PostgreSQL (with pgvector) via `pg`.
 - `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
   analysis, work-package decomposition and capability insights across three
   interchangeable providers (OpenAI-compatible — currently Groq — Anthropic,
@@ -173,7 +177,35 @@ it appeared in, the scores, the eligibility verdict, the department's
 shortlist reason, or any other supplier — those are different queries in a
 different router, not the same response with fields hidden. An invitation is
 not an award: accepting registers an intent to respond, and the structured
-response itself is Milestone 8.
+response follows it.
+
+**Structured responses.** For a confirmed work package the official configures
+what is being asked for — an expression of interest, an RFI response, a
+proposal or a quotation — with a deadline, instructions, which sections are
+required or optional, whether clarifications and documents are allowed, and
+any custom questions. Opening it notifies every supplier that accepted its
+invitation. The supplier drafts the response over as many sittings as it
+needs, answering each confirmed requirement individually with a stated
+position, filling in the technical, execution, timeline, capacity, experience,
+compliance and commercial sections the department asked for, attaching
+supporting documents, and watching a progress indicator that is the server's
+own completeness computation rather than a count in the browser. A review
+screen shows exactly what will be sent and what is still outstanding before
+the supplier submits.
+
+Once submitted, the response cannot be modified: every write route carries the
+editable-state predicate in its `WHERE` clause. The department reads the whole
+submission — requirement answers, sections, custom answers, attachments —
+opens a review, and can request a clarification, which reopens the response
+for the supplier to amend and resubmit. A supplier can ask its own questions
+where the department allowed them. The complete exchange is kept with its
+actors and timestamps, and every lifecycle event is written to the work
+package's audit history. A department cannot read a draft the supplier has
+not submitted.
+
+Milestone 8 stops at *ready for evaluation*: that state records that a
+response is complete enough to be assessed. It is not a score, a rank or an
+award — evaluating responses is Milestone 9.
 
 **Authentication and access control.** Sessions are opaque tokens stored in
 PostgreSQL and delivered in an `HttpOnly; SameSite=Strict` cookie; passwords
@@ -185,8 +217,8 @@ another's projects by changing a URL. The frontend hides controls a role
 cannot use, but the backend is the boundary that actually enforces it. See
 [docs/engineering/security.md](docs/engineering/security.md).
 
-Not implemented: structured vendor responses and proposal evaluation
-(Milestones 8–9), and vendor gap analysis (Milestone 10). See
+Not implemented: proposal evaluation, document intelligence and response
+ranking (Milestone 9), and vendor gap analysis (Milestone 10). See
 [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
 and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for
 what is explicitly out of scope until requested.

@@ -6,7 +6,7 @@ vision, and marks what is currently implemented.
 
 ## Currently Implemented
 
-Milestones 1 through 7 — see
+Milestones 1 through 8 — see
 [../development-roadmap.md](../development-roadmap.md) for full detail.
 
 - **Milestone 1** — React frontend and Express backend communicating over
@@ -41,30 +41,42 @@ Milestones 1 through 7 — see
   recorded reason, and invites shortlisted suppliers to respond. The
   supplier is notified in the portal, opens the invitation, sees the work
   package it concerns, and accepts or declines with a reason. Every
-  shortlist and invitation act is audited against the work package. The
-  structured proposal itself is Milestone 8.
+  shortlist and invitation act is audited against the work package.
+- **Milestone 8** — response and proposal collection: the official configures
+  what response a confirmed work package requires (expression of interest,
+  RFI, proposal or quotation), with a deadline, required and optional
+  sections, custom questions, and whether clarifications and documents are
+  allowed; opening it notifies every supplier that accepted its invitation.
+  The supplier drafts a resumable response, answers each confirmed
+  requirement individually, attaches documents, reviews it and submits.
+  Submission is validated server-side against the department's own
+  configuration and the response becomes immutable. Either side can raise a
+  clarification; the official moves the submission through review to *ready
+  for evaluation*, which is where Milestone 9 begins.
 
 All three services (`apps/web`, `apps/api`, `apps/ai-service`) run together.
 
 ## Current Development Stage
 
-Milestones 1 through 7 are complete. The next milestone is **Milestone 8 —
-vendor response and proposal collection**: letting an invited supplier who has
-accepted submit a structured, deadline-bound response against the work package
-it accepted, and letting the official configure and track that process. See
+Milestones 1 through 8 are complete. The next milestone is **Milestone 9 —
+evaluation and AI-assisted decision support**: turning the collected responses
+into a comparable, explainable basis for a human decision. See
 [../development-roadmap.md](../development-roadmap.md).
 
-Nothing in Milestone 7 anticipates that schema. Accepting an invitation
-registers intent to respond and no more; the response entity is deliberately
-unmodelled until the workflow that uses it is specified — the same reasoning
-that kept the shortlist minimal in Milestone 6 (D69).
+Nothing in Milestone 8 anticipates that schema. `READY_FOR_EVALUATION` records
+that a response is complete enough to be assessed and no more; no score, rank
+or comparison exists, and the evaluation entity is deliberately unmodelled
+until the workflow that uses it is specified — the same reasoning that kept
+the shortlist minimal in Milestone 6 (D69) and the response unmodelled through
+Milestone 7.
 
 The roadmap was re-sequenced twice from the original problem-statement
 ordering: authentication and RBAC (Milestone 5) were moved ahead of vendor
 work (D43), and within Milestone 6, vendor onboarding was built before
 work-package-level matching, for the same reason — matching needs vendors
-and work packages to exist first. Milestone 7 followed the same dependency:
-an invitation needs a shortlist, and a shortlist needs a ranking.
+and work packages to exist first. Milestones 7 and 8 followed the same
+dependency chain: an invitation needs a shortlist, a shortlist needs a
+ranking, and a response needs an accepted invitation.
 
 ## Explicitly Out of Scope for the Current Stage
 

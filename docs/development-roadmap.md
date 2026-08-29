@@ -354,27 +354,134 @@ Not built, and deliberately left to Milestone 8: the structured response
 itself. Accepting an invitation registers intent to respond; it is not a
 proposal, a quotation or a commitment to supply.
 
-## Milestone 8 — Vendor Response and Proposal Collection (Planned, Not Detailed)
+## Milestone 8 — Vendor Response and Proposal Collection (Complete)
 
-Goal: let an invited vendor respond to a specific work package, and let the
-official configure and track that response process.
+Goal: let an invited vendor who has accepted submit a structured,
+deadline-bound response against that work package, and let the official
+configure, receive and track it.
 
-- Vendor side: receive an invitation, view the relevant work package and
-  requirements, ask clarification questions where the procurement type
-  allows it, submit an RFI response / expression of interest / proposal /
-  quotation as appropriate to the workflow, attach supporting documents,
-  and track submission status and deadlines.
-- Government side: configure what response is required, set a deadline,
-  receive and track submissions, request clarification from a vendor.
-- This is a materially different vendor action from the "register interest
-  in an opportunity" flow already built in Milestone 6 — that is an
-  unstructured signal of interest at project level; this is a structured,
-  work-package-scoped, deadline-bound response.
+    ACCEPTED invitation                    (Milestone 7)
+      -> response configuration            — type, deadline, sections, questions
+      -> opened to the accepting suppliers — they are notified
+      -> resumable draft                   — saved as the supplier goes
+      -> requirement-by-requirement answers
+      -> documents, clarifications
+      -> review screen -> submission       — validated server-side
+      -> UNDER_REVIEW -> READY_FOR_EVALUATION   — Milestone 9 follows
+
+- [x] **Response configuration** per confirmed work package (D78): one of
+      four response types — expression of interest, RFI, proposal,
+      quotation — each with its own sensible section defaults; a deadline;
+      instructions; every section set to required, optional or not asked
+      for; whether clarifications are allowed; whether documents are
+      allowed and whether one is mandatory. One configuration per work
+      package, never per supplier, so the responses can be read side by
+      side.
+- [x] **Custom questions** attached to the configuration, in seven answer
+      types, each optional or mandatory and shown under a chosen section.
+      Asked of every supplier, so the answers stay comparable.
+- [x] **Opening and closing.** A configuration is drafted, then opened — the
+      act that makes a response possible and notifies every supplier that
+      accepted its invitation, in the same request (D74) — then closed.
+      Once anything has been submitted, the response type and section modes
+      freeze; the deadline and instructions stay editable.
+- [x] **One declaration of what is asked for** (D79):
+      `apps/api/src/responses/schema.ts` is served to the frontend and read
+      by the configuration screen, the supplier's form, the progress
+      indicator and the submission check. Section values are explicit
+      columns, not a jsonb blob, because Milestone 9 will compare them.
+- [x] **Vendor response**, opened from an accepted invitation and resumable
+      across sittings: an executive summary, the confirmed requirements
+      answered individually with a stated position
+      (`MEETS` / `PARTIALLY_MEETS` / `DOES_NOT_MEET` / `NOT_APPLICABLE`) and
+      prose, and the technical, execution, timeline, capacity, experience,
+      compliance and commercial sections the department asked for. Opening
+      is idempotent — a supplier returning to the page resumes its draft.
+- [x] **Supporting documents** (D84) in their own table, with the bytes going
+      through the one storage module that already decodes, size-limits and
+      signature-checks an upload.
+- [x] **Progress and review** (D80): one server-side completeness
+      computation drives both the supplier's progress indicator and the
+      submission gate, so a response the bar shows as ready is one the API
+      accepts. A review screen lists every section, what is outstanding, and
+      exactly what will be sent.
+- [x] **Submission** validated entirely server-side against the department's
+      stored configuration — every required field, requirement, question and
+      a mandatory document if one was demanded — and refused with the list of
+      what is missing. The submission moment and the supplier's own user are
+      recorded.
+- [x] **Immutability after submission** (D81), expressed as a predicate
+      rather than a UI state: the editable set is `DRAFT` and
+      `CLARIFICATION_REQUESTED`, and it appears in the `WHERE` clause of
+      every write route, so a route added later that forgets it writes
+      nothing.
+- [x] **Lifecycle** `DRAFT -> SUBMITTED -> UNDER_REVIEW ->
+      CLARIFICATION_REQUESTED -> RESUBMITTED -> UNDER_REVIEW ->
+      READY_FOR_EVALUATION`, with `WITHDRAWN` reachable by the supplier
+      before evaluation, every transition a conditional `UPDATE`. No
+      `EXPIRED` state and no background job: a passed deadline is derived at
+      read time and enforced at submission, with a department-requested
+      clarification exempt.
+- [x] **Clarifications in both directions** (D82) in one thread: the
+      department requests one and reopens the response; the supplier answers
+      and resubmits; the supplier asks its own where allowed and the
+      department answers. The side that asked cannot answer, neither the
+      question nor the answer is editable, and the whole exchange keeps its
+      actors and timestamps.
+- [x] **Government response workspace** at
+      `projects/:id/work-packages/:workPackageId/responses`: vendor,
+      response type, status, submitted-at and deadline for every response,
+      status counts, which accepted suppliers have not started, and the
+      confirmed requirements suppliers are answering. A full response reader
+      shows the requirement answers, every section, the custom answers, the
+      attachments and the clarification thread.
+- [x] **A draft is not readable by the department** (D83). The workspace
+      shows that one exists and whose it is; its contents are served only
+      after submission, and its attachments are not downloadable.
+- [x] **Supplier portal** at `/vendor/responses` and `/vendor/responses/:id`,
+      reached from the accepted invitation and from the header navigation,
+      with the sectioned editor, the progress meter, the review step and the
+      clarification thread.
+- [x] **Notifications** reuse `vendor_notifications` with a `RESPONSE`
+      category and a `response_id` pointer: a response becoming available,
+      a clarification requested or answered, a review opened, a response
+      accepted for evaluation, and the supplier's own submission and
+      withdrawal. The existing header bell and unread count carry them
+      unchanged.
+- [x] **Audit** in `work_package_history` (D73), extended with eleven
+      response actions. A supplier's submission, withdrawal and clarification
+      answer are attributed to the supplier's own user.
+- [x] **RBAC** (D85): `response:configure` and `response:manage` for
+      `GOVERNMENT_OFFICIAL`; `response:read` for `GOVERNMENT_OFFICIAL` and
+      `ADMIN`; `vendor:response:read` and `vendor:response:submit` for
+      `VENDOR`. No role holds a permission from both sides.
+
+Migration `009_vendor_responses.sql`. Delivers FR5.1 and extends FR11.1.
+
+Verified by `apps/api/tests/responses.unit.test.ts` (28 tests over the
+catalogue, the answer validators and the completeness computation) and
+`apps/api/tests/responses.integration.test.ts` (72 tests over HTTP covering
+the whole flow and, mostly, the requests that must be refused:
+cross-organization access, cross-supplier access, an unconfirmed package, a
+supplier opening a response before the department opened it, an unknown field,
+an out-of-range choice, an incomplete submission, a second submission, an edit
+after submission, a configuration change after a submission, a passed
+deadline, a disallowed clarification, a disallowed document, each side trying
+to answer its own clarification, a resubmission with an outstanding question,
+a withdrawal after evaluation began, and an administrator attempting a
+procurement act).
+
+Not built, and deliberately left to Milestone 9: any assessment of a
+collected response. `READY_FOR_EVALUATION` records that a response is complete
+enough to be assessed; there is no score, no rank, no comparison and no
+recommendation anywhere in this milestone.
 
 ## Milestone 9 — Evaluation and AI-Assisted Decision Support (Planned, Not Detailed)
 
-Goal: turn collected vendor responses into a comparable, explainable basis
-for a human decision.
+Goal: turn the responses Milestone 8 collects into a comparable, explainable
+basis for a human decision. It starts from `READY_FOR_EVALUATION` and from the
+requirement-by-requirement answers, section values and attachments already
+stored — no new collection mechanism is needed.
 
 - Structured extraction of key information from vendor submissions
   (document intelligence).

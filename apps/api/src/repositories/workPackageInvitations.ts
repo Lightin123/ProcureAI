@@ -17,7 +17,7 @@
  */
 
 import { query } from "../db/pool.js";
-import { toIsoDay } from "./dates.js";
+import { dayHasPassed, toIsoDay } from "./dates.js";
 
 export type InvitationStatus = "INVITED" | "ACCEPTED" | "DECLINED" | "WITHDRAWN";
 
@@ -288,6 +288,31 @@ export interface VendorInvitation {
   packageComplexity: string;
   packagePriority: string;
   deliverables: string[];
+
+  /**
+   * Milestone 8. What the department has asked for by way of a structured
+   * response, and how far this supplier has got with it.
+   *
+   * Carried on the invitation because the invitation is where the supplier
+   * looks next: an accepted invitation with an open response configuration is
+   * the one place "respond now" belongs. It stays within the D76 boundary —
+   * it says what is being asked of this supplier, and nothing about how the
+   * supplier was assessed or about any other supplier.
+   */
+  response: VendorInvitationResponseState;
+}
+
+export interface VendorInvitationResponseState {
+  /** Whether the department has configured a response for this work package. */
+  configured: boolean;
+  /** Whether that configuration is open for responses right now. */
+  open: boolean;
+  responseType: string | null;
+  responseDeadline: string | null;
+  deadlinePassed: boolean;
+  /** This supplier's own response, once it has opened one. */
+  responseId: string | null;
+  responseStatus: string | null;
 }
 
 interface VendorRow {
@@ -313,6 +338,11 @@ interface VendorRow {
   package_complexity: string;
   package_priority: string;
   deliverables: string[];
+  config_status: string | null;
+  config_response_type: string | null;
+  config_deadline: Date | null;
+  response_id: string | null;
+  response_status: string | null;
 }
 
 function toVendorInvitation(row: VendorRow): VendorInvitation {
@@ -339,6 +369,15 @@ function toVendorInvitation(row: VendorRow): VendorInvitation {
     packageComplexity: row.package_complexity,
     packagePriority: row.package_priority,
     deliverables: row.deliverables ?? [],
+    response: {
+      configured: row.config_status !== null,
+      open: row.config_status === "OPEN",
+      responseType: row.config_response_type,
+      responseDeadline: toIsoDay(row.config_deadline),
+      deadlinePassed: dayHasPassed(toIsoDay(row.config_deadline)),
+      responseId: row.response_id,
+      responseStatus: row.response_status,
+    },
   };
 }
 
@@ -353,11 +392,18 @@ const VENDOR_SELECT = `
          wp.estimated_category AS package_category,
          wp.complexity::text AS package_complexity,
          wp.priority::text AS package_priority,
-         wp.deliverables
+         wp.deliverables,
+         cfg.status::text AS config_status,
+         cfg.response_type::text AS config_response_type,
+         cfg.response_deadline AS config_deadline,
+         resp.id AS response_id,
+         resp.status::text AS response_status
   FROM work_package_invitations i
   JOIN work_packages wp ON wp.id = i.work_package_id
   JOIN procurement_projects pr ON pr.id = i.project_id
   JOIN organizations o ON o.id = i.organization_id
+  LEFT JOIN work_package_response_configs cfg ON cfg.work_package_id = i.work_package_id
+  LEFT JOIN work_package_responses resp ON resp.invitation_id = i.id
 `;
 
 /**

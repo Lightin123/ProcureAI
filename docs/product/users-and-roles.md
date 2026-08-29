@@ -81,7 +81,9 @@ Responsibilities (planned, Milestone 8):
   unstructured "register interest" signal and the accept/decline already
   implemented.
 
-Permissions: `vendor:profile:read`, `vendor:profile:manage`,
+Permissions (Milestone 8 adds `vendor:response:read` and
+`vendor:response:submit`, held by no other role): `vendor:profile:read`,
+`vendor:profile:manage`,
 `vendor:opportunity:read`, `vendor:opportunity:engage`,
 `vendor:invitation:read`, `vendor:invitation:respond`. A vendor holds
 **no** project, requirement, workflow, matching, shortlist or
@@ -130,6 +132,11 @@ authoritative mapping. This table mirrors that file.
 | `vendor:invitation:manage` | Yes | — | — |
 | `vendor:invitation:read` | — | — | Yes |
 | `vendor:invitation:respond` | — | — | Yes |
+| `response:configure` | Yes | — | — |
+| `response:read` | Yes | Yes | — |
+| `response:manage` | Yes | — | — |
+| `vendor:response:read` | — | — | Yes |
+| `vendor:response:submit` | — | — | Yes |
 
 Every "Yes" is additionally scoped to the user's own organization — see
 [Organization Scope](#organization-scope) — **except** `vendor:registry:read`

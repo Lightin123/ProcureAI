@@ -6,10 +6,11 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 5 (Authentication and RBAC) complete — real
-> users sign in, and every API endpoint is protected by an authenticated
-> session, a permission check, and organization scoping. See
-> [Current Status](#current-status) below.
+> **Project status:** Milestone 6 (Vendor Ecosystem) complete — suppliers
+> self-register and are verified, and for a confirmed work package an official
+> gets a ranked, explainable list of eligible suppliers produced by
+> deterministic eligibility filtering plus hybrid lexical and semantic
+> retrieval. See [Current Status](#current-status) below.
 
 ## Problem Statement
 
@@ -110,24 +111,45 @@ for details and rationale.
 
 ## Current Status
 
-**Milestones 1–3 and 5 are complete.** Milestone 4 (work packages) is being
-built on a separate branch.
+**Milestones 1–6 are complete.**
 
 An official signs in, creates a procurement project, runs AI analysis on its
 problem description, reviews the suggested requirements and constraints,
 answers clarification questions, and confirms the requirements — moving the
-project `DRAFT → REQUIREMENTS_ANALYSIS → REQUIREMENTS_CONFIRMED`. Every action
-is recorded against the authenticated user who performed it.
+project `DRAFT → REQUIREMENTS_ANALYSIS → REQUIREMENTS_CONFIRMED`. They then
+decompose the confirmed requirements into work packages, review and confirm
+those, and for any confirmed package run supplier matching. Every action is
+recorded against the authenticated user who performed it.
 
-- `apps/web` — React + TypeScript + Vite. Sign-in screen, projects register,
-  project detail, create form, requirements review screen, vendor landing
-  page, and System Status. Routes and navigation are permission-aware.
-- `apps/api` — Express + TypeScript. Authentication, health, projects, and
-  requirement analysis endpoints, backed by PostgreSQL via `pg`.
+Suppliers self-register, complete a progressive capability onboarding, are
+verified by an administrator, and see published opportunities matched against
+their own profile.
+
+- `apps/web` — React + TypeScript + Vite. Sign-in, projects register, project
+  detail, create form, requirements review, work packages, supplier matching
+  with comparison and shortlisting, the vendor portal, the supplier registry,
+  and System Status. Routes and navigation are permission-aware.
+- `apps/api` — Express + TypeScript. Authentication, projects, requirement
+  analysis, work packages, vendor profiles, and work-package supplier matching,
+  backed by PostgreSQL (with pgvector) via `pg`.
 - `apps/ai-service` — Python + FastAPI + Pydantic. Structured requirement
-  analysis with three interchangeable providers selected by configuration:
-  OpenAI-compatible (currently Groq), Anthropic, and a deterministic stub
-  that needs no API key.
+  analysis, work-package decomposition and capability insights across three
+  interchangeable providers (OpenAI-compatible — currently Groq — Anthropic,
+  and a deterministic stub that needs no API key), plus an embedding service
+  configured separately. Embeddings default to `BAAI/bge-small-en-v1.5`, a real
+  sentence encoder running locally on CPU — no API key, ~90 MB downloaded once,
+  then offline. A deterministic concept-space model is the offline fallback.
+
+**Work-package supplier matching.** For a confirmed work package the backend
+normalises what is being procured, applies a deterministic eligibility filter
+as a hard gate (mandatory certifications, credential validity, delivery region,
+contract value, profile assessability), retrieves candidates by both keyword
+overlap and pgvector semantic similarity, unions and deduplicates them, and
+ranks the eligible ones on seven weighted dimensions. Nothing is decided by a
+model: every score is arithmetic over stored supplier data, and every line of
+every explanation quotes a value the supplier actually recorded. Suppliers who
+fail a mandatory requirement are excluded rather than ranked lower, and the
+exclusions and their grounds are shown to the official alongside the ranking.
 
 Every AI suggestion is reviewable — nothing enters the confirmed record
 without an explicit decision by the official.
@@ -142,8 +164,10 @@ another's projects by changing a URL. The frontend hides controls a role
 cannot use, but the backend is the boundary that actually enforces it. See
 [docs/engineering/security.md](docs/engineering/security.md).
 
-Vendor discovery, work packages, and semantic search are not implemented yet.
-See [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
+Not implemented: vendor invitation and the engagement workflow around the
+shortlist (Milestone 7), structured vendor responses and proposal evaluation
+(Milestones 8–9), and vendor gap analysis (Milestone 10). See
+[docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
 and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for
 what is explicitly out of scope until requested.
 
@@ -201,6 +225,16 @@ The provider is chosen automatically from whichever key is present, and
 active provider, as does the portal's System Status screen (and
 `GET /api/v1/system/status`, which requires a signed-in official or
 administrator).
+
+**Embeddings are configured separately and need no key.** Semantic vendor
+matching defaults to `BAAI/bge-small-en-v1.5`, a sentence encoder that runs
+locally on CPU; `pip install -r requirements.txt` brings in `fastembed`, and
+the model itself (~90 MB) is downloaded on the first embedding call and cached,
+after which it works offline. If that download cannot happen, the service falls
+back to a deterministic concept-space model and logs that it did — semantic
+matching still works, but generalises only over a built-in procurement
+vocabulary. Hosted embeddings are opt-in via `EMBEDDING_API_KEY`. The embedding
+model and its dimensionality are reported by `GET /health`.
 
 **4. Start the frontend** in a third terminal:
 
@@ -260,6 +294,16 @@ liveness probe and is the only endpoint that needs no session.
 
 Scripts: `npm run dev`, `npm run build`, `npm run typecheck` in both
 projects; `npm run migrate` and `npm run seed` in `apps/api`.
+
+Tests, in `apps/api`: `npm test` runs the matching unit suite and needs no
+database or AI service. `npm run test:integration` exercises the full matching
+pipeline against real data and needs both — run `npm run migrate && npm run
+seed` first, and have `apps/ai-service` running. It skips rather than fails
+when `DATABASE_URL` is unset.
+
+`npx tsx scripts/matchDemo.ts` prints the ranking every confirmed package in
+the seeded demonstration project produces, which is the quickest way to see
+the eligibility gate and hybrid retrieval working.
 
 ---
 

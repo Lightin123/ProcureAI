@@ -45,30 +45,39 @@ implemented vs. planned.
 
 ### FR4 — Vendor / Startup Discovery
 
-**Status: partially implemented.** A vendor onboarding, verification and
-project-level matching precursor exists (see
+**Status: implemented.** Vendor onboarding, verification, and
+work-package-level hybrid matching are all built (see
 [users-and-roles.md](users-and-roles.md) and
-[../ai/vendor-discovery.md](../ai/vendor-discovery.md)), but FR4.1 as
-specified below — semantic, work-package-level discovery — is the current
-development priority and not yet built. What exists today is deterministic
-lexical matching at whole-project granularity, described in
-[../ai/vendor-discovery.md](../ai/vendor-discovery.md) as a distinct,
-narrower capability from FR4.
+[../ai/vendor-discovery.md](../ai/vendor-discovery.md)). A separate,
+narrower project-level lexical match also remains, powering the
+vendor-facing opportunity feed rather than FR4.
 
 - FR4.1: The system discovers candidate vendors using semantic search over
   vendor capability data, **scoped to a specific confirmed work package**.
-  Not yet implemented — see
+  Implemented. The package, its linked requirements, and light project
+  context are normalized into a weighted term set and a document; the
+  capability-bearing part of that document is embedded and matched by
+  pgvector cosine similarity against stored vendor capability embeddings,
+  above a minimum calibrated per embedding model (0.65 for the current
+  one), unioned with a lexical keyword-overlap pass. pgvector is optional — where it is
+  absent the run degrades to lexical-only with a visible warning. See
   [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md).
 - FR4.2: The system supports structured filtering (e.g. sector, size,
   location, certifications) alongside semantic search, applied as a
   deterministic eligibility gate prior to ranking (not folded into the
   match score) — see
-  [../ai/vendor-discovery.md](../ai/vendor-discovery.md#eligibility-filtering-planned).
-  Not yet implemented as a distinct gate; a version of several of these
-  signals currently contributes to the project-level match score instead.
+  [../ai/vendor-discovery.md](../ai/vendor-discovery.md#eligibility-filtering).
+  Implemented as a distinct hard gate that runs before any scoring and is
+  never expressed as a score: profile assessability, verification not
+  rejected, mandatory certifications, credential validity, delivery
+  region, and contract value ceiling. Each result quotes the requirement
+  and the supplier evidence behind it; an unconstrained dimension produces
+  no check at all.
 - FR4.3: The official can review and adjust the candidate vendor list.
-  Not yet implemented — depends on FR4.1/FR4.2 producing a package-level
-  candidate list to review.
+  Implemented. Officials see ranked supplier cards with per-dimension
+  scores, strengths and gaps, an inspectable list of excluded suppliers
+  and the check each failed, a side-by-side comparison of up to four
+  suppliers, and can shortlist or remove suppliers and recalculate a run.
 
 ### FR5 — RFI / Proposal Collection
 - FR5.1: The system supports collecting RFI responses or proposal documents
@@ -200,13 +209,13 @@ on what "in progress" covers. Against the functional requirements above:
 | FR2.5 — official answers clarifications, fed back into analysis | Implemented |
 | FR2.6 — edit / approve / reject AI-extracted requirements | Implemented, with rejection requiring a reason |
 | FR3.1–FR3.3 — work package decomposition, review, single-package path | Implemented |
-| FR4.1 — semantic, work-package-level vendor discovery | Not implemented. A narrower, project-level, lexical-only precursor exists — see [../ai/vendor-discovery.md](../ai/vendor-discovery.md) |
-| FR4.2 — structured filtering as a deterministic eligibility gate | Not implemented as a distinct gate; related signals currently contribute to the project-level match score instead |
-| FR4.3 — official reviews/adjusts the candidate vendor list | Not implemented (depends on FR4.1/FR4.2) |
+| FR4.1 — semantic, work-package-level vendor discovery | Implemented. Hybrid retrieval — pgvector cosine over capability embeddings, unioned with lexical keyword overlap — scoped to a confirmed work package; degrades to lexical-only where pgvector is absent |
+| FR4.2 — structured filtering as a deterministic eligibility gate | Implemented as a distinct hard gate running before ranking, never as a score: profile assessability, verification not rejected, mandatory certifications, credential validity, delivery region, contract value ceiling |
+| FR4.3 — official reviews/adjusts the candidate vendor list | Implemented: ranked cards with per-dimension scores, inspectable exclusions, side-by-side comparison, shortlisting, recalculation |
 | FR5 — RFI / proposal collection | Not implemented |
 | FR6 — document intelligence | Not implemented |
 | FR7 — evaluation | Not implemented (this is response evaluation; see Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md), distinct from the vendor-ranking work in FR4) |
-| FR8 — ranking and recommendation | Not implemented at work-package level. A project-level, explainable ranking exists as part of the FR4 precursor |
+| FR8 — ranking and recommendation | Deferred as specified (this is ranking of evaluated *responses*, and FR8.4 combination recommendation, both Milestone 9+). The ranking of discovered *candidates* that FR4 needs is implemented: seven deterministic weighted dimensions per work package, each individually inspectable, every recommendation carrying its evidence |
 | FR9 — human review and decision | Implemented for every AI-generated suggestion built so far (requirements, work packages); FR9.2 (recording a final procurement decision) awaits Milestone 9 |
 | FR10 — access control | Implemented (Milestone 5): three roles, permission-based authorization, organization scoping enforced on every query |
 | FR11.1 — auditability of key actions | Implemented for requirement and work-package decisions, stage transitions, and vendor verification decisions. A general-purpose audit log across all data areas does not exist |

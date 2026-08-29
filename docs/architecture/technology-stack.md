@@ -28,10 +28,14 @@ backend framework paradigm.
 - Python
 - FastAPI
 - Pydantic
+- `fastembed` (ONNX Runtime)
 
 Rationale: Python has the strongest ecosystem for AI/ML/NLP work; FastAPI
 gives typed, validated request/response models via Pydantic, which directly
 supports the "AI output must be structured and validated" principle.
+`fastembed` runs the default embedding model, `BAAI/bge-small-en-v1.5`, as a
+quantised ONNX graph on CPU — a real sentence encoder with no API key, no
+torch, and no network after the one-off model download (D70).
 
 The LLM is reached through one of three interchangeable providers, selected by
 configuration rather than code (see

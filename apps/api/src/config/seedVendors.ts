@@ -1044,4 +1044,234 @@ export const SEEDED_VENDORS: readonly SeedVendor[] = [
     experience: [],
     credentials: [],
   },
+
+  /**
+   * Present specifically to demonstrate what semantic retrieval adds.
+   *
+   * This cooperative does exactly the work the solar street lighting package
+   * describes, but says so in its own vocabulary: it writes about "decentralised
+   * renewable electrification" and "habitations beyond the distribution
+   * network", not about "street lighting" or "luminaires". A keyword matcher
+   * reads the two texts as unrelated. The concept-space embedding does not,
+   * because both are about renewable power and illumination for places the grid
+   * does not reach.
+   *
+   * The profile is otherwise ordinary and the organisation is a plausible one —
+   * the wording is not contrived to defeat the lexical matcher, it is how a
+   * rural energy cooperative actually describes itself.
+   */
+  {
+    organizationCode: "VND-URJA-SAHKAR",
+    organizationName: "Urja Sahkar Rural Energy Cooperative Limited",
+    email: "supplier.energy@procureai.local",
+    fullName: "Nandita Rao",
+    status: "SUBMITTED",
+    verificationState: "VERIFIED",
+    profile: {
+      legalName: "Urja Sahkar Rural Energy Cooperative Limited",
+      organizationType: "COOPERATIVE",
+      yearEstablished: 2014,
+      registrationNumber: "U40108MH2014PLC259871",
+      website: "https://urjasahkar.example.in",
+      identifiers: { gstin: "27AAGCU5521M1ZP", pan: "AAGCU5521M", udyam: "UDYAM-MH-18-0091244" },
+      eligibility: { flags: ["msme", "cooperative"], msmeCategory: "SMALL" },
+      registeredAddress: {
+        line1: "Urja Bhavan, Station Road",
+        city: "Ahmednagar",
+        district: "Ahmednagar",
+        state: "Maharashtra",
+        pincode: "414001",
+      },
+      operatingStates: ["Maharashtra", "Karnataka", "Madhya Pradesh"],
+      primaryContact: {
+        name: "Nandita Rao",
+        designation: "Managing Director",
+        email: "supplier.energy@procureai.local",
+        phone: "+91 241 242 8890",
+      },
+      authorisedRepresentative: {
+        name: "Nandita Rao",
+        designation: "Managing Director",
+        email: "supplier.energy@procureai.local",
+      },
+      industries: ["ENERGY", "INFRASTRUCTURE", "SUSTAINABILITY"],
+      subDomains: ["Decentralised renewable energy", "Rural electrification", "Energy storage"],
+      solutionTypes: ["PHYSICAL_PRODUCT", "INFRASTRUCTURE_CONSTRUCTION", "OPERATIONAL_SERVICES"],
+      headline:
+        "Decentralised renewable electrification for habitations beyond the distribution network",
+      capabilitySummary:
+        "We build and maintain autonomous renewable power installations for habitations that the distribution network reaches unreliably or not at all. Our work is photovoltaic generation paired with electrochemical storage, sized so that a hamlet has usable power through the hours of darkness and through a monsoon week of cloud cover. We have installed roughly 9,400 autonomous units across three states since 2014, and we hold the maintenance obligation on 7,100 of them, which is why our designs favour a serviceable battery and a replaceable driver over a sealed assembly.",
+      problemBeingSolved:
+        "Habitations at the end of a feeder receive power too intermittently to be useful after dark, and the gram panchayat cannot meet a recurring energy bill even where a connection exists, so conventional fittings are installed once and then abandoned unlit.",
+      coreCapabilities: [
+        "Autonomous photovoltaic installation",
+        "Electrochemical storage sizing and replacement",
+        "Habitation-level electrification survey",
+        "Long-duration maintenance obligations",
+        "Community operator training",
+      ],
+      expertiseAreas: [
+        "Off-grid renewable generation",
+        "Battery lifecycle management in field conditions",
+        "Rural energy cooperatives",
+      ],
+      problemDomains: [
+        "Unelectrified habitations",
+        "Recurring energy cost at panchayat level",
+        "Abandoned fittings after installation",
+      ],
+      sectorsServed: ["Rural development", "Energy", "Panchayati raj"],
+      targetCustomers: [
+        "Gram panchayats",
+        "Zilla parishads",
+        "State renewable energy agencies",
+        "District administrations",
+      ],
+      differentiators:
+        "We keep the maintenance obligation rather than handing over and leaving, which is why 7,100 of our 9,400 installations are still functioning. The sector norm is that an autonomous installation stops working in its third year when the storage fails and nobody is contracted to replace it.",
+      valueProposition:
+        "A panchayat gets power after dark that carries no recurring bill and does not stop working in year three, because the storage replacement is contracted from the outset.",
+      deliveryModels: ["DIRECT_SUPPLY", "TURNKEY", "ON_SITE_DEPLOYMENT", "MANAGED_SERVICE"],
+      serviceCoverage: "MULTI_STATE",
+      coverageNotes:
+        "Installation and maintenance teams based at Ahmednagar, Belagavi and Betul, covering 14 districts across three states.",
+      teamSize: 132,
+      domainExpertise: [
+        "Renewable energy engineers",
+        "Storage technicians",
+        "Field survey teams",
+      ],
+      deliveryCapability:
+        "Up to 260 autonomous installations commissioned per month across six field teams, with a survey-to-commissioning cycle of five weeks.",
+      capacityNotes:
+        "Assembly and testing facility at Ahmednagar rated at 400 units per month. Storage replacement programme covering 7,100 installations under maintenance.",
+      scalabilityNotes:
+        "A seventh field team can be raised within a quarter; assembly capacity is the binding constraint above 400 units per month.",
+      infrastructureNotes:
+        "Owned assembly and testing facility at Ahmednagar, three district depots, and a field-returns laboratory for storage failure analysis.",
+      governmentScaleReadiness: "STATE_SCALE",
+      minProjectValueInr: 2_500_000,
+      typicalProjectValueInr: 38_000_000,
+      maxProjectValueInr: 260_000_000,
+      governmentExperience: "STATE",
+      gemRegistered: true,
+      pastTenderExperience:
+        "Empanelled with the state renewable energy agency since 2018 and awarded four district-level electrification packages under competitive tender.",
+      solutionNovelty: "INCREMENTAL",
+      innovationStage: "SCALING",
+      deploymentReadiness: "DEPLOYMENT_READY",
+      innovationDescription:
+        "The design decision that matters is serviceability: every failure-prone component is replaceable by a district technician with ordinary tools, because the constraint in this sector is maintenance access rather than generation efficiency.",
+      measurableImpact:
+        "9,400 autonomous installations across three states since 2014, of which 7,100 remain under our maintenance obligation and 94 per cent were functioning at the most recent quarterly audit.",
+      hasIntellectualProperty: false,
+      dynamicAnswers: {
+        impactMetrics: [
+          "Installations functioning at quarterly audit",
+          "Hours of usable power after dark",
+          "Storage replacements completed within obligation",
+        ],
+        measurementMethodology:
+          "Quarterly physical audit of a 5 per cent sample across every district, reconciled with the maintenance ticket record.",
+        operationalRegions: ["Ahmednagar", "Solapur", "Belagavi", "Betul", "Chhindwara"],
+        productionCapacity: "400 autonomous units per month from the Ahmednagar assembly line.",
+        facilities:
+          "Assembly and testing facility at Ahmednagar; district depots at Belagavi and Betul; field-returns laboratory.",
+        fieldDeployment:
+          "Six commissioning teams of four, plus district maintenance technicians covering 14 districts.",
+      },
+    },
+    offerings: [
+      {
+        kind: "PRODUCT",
+        name: "Autonomous photovoltaic illumination unit",
+        description:
+          "A self-contained pole-mounted unit comprising a photovoltaic module, electrochemical storage, driver and fitting, sized for eleven hours of output after a single day of charging under monsoon cloud cover.",
+        categories: ["Renewable energy", "Rural electrification"],
+        tags: ["autonomous", "photovoltaic", "storage", "pole-mounted"],
+        sectors: ["Rural development", "Energy"],
+      },
+      {
+        kind: "SERVICE",
+        name: "Habitation electrification survey and siting",
+        description:
+          "Survey of a habitation to fix installation points with the gram panchayat, accounting for shading, footfall and the locations the panchayat considers unsafe after dark.",
+        categories: ["Survey", "Rural electrification"],
+        tags: ["survey", "siting", "panchayat"],
+        sectors: ["Rural development", "Panchayati raj"],
+      },
+      {
+        kind: "SERVICE",
+        name: "Multi-year maintenance and storage replacement",
+        description:
+          "A contracted maintenance obligation covering fault attendance, driver replacement and scheduled replacement of electrochemical storage across the contract period.",
+        categories: ["Operations and maintenance"],
+        tags: ["maintenance", "storage replacement", "field service"],
+        sectors: ["Energy", "Rural development"],
+      },
+    ],
+    experience: [
+      {
+        title: "Autonomous electrification of 3,180 habitation points across four districts",
+        clientName: "Maharashtra Energy Development Agency",
+        clientType: "STATE_GOVERNMENT",
+        sector: "Rural development",
+        description:
+          "Survey, supply, installation and five-year maintenance of 3,180 autonomous photovoltaic illumination units across 412 gram panchayats in four districts, including the storage replacement obligation.",
+        outcome:
+          "96 per cent of installations functioning at the fourth-year audit against a contractual threshold of 90 per cent.",
+        contractValueInr: 214_000_000,
+        startYear: 2019,
+        endYear: 2024,
+      },
+      {
+        title: "Renewable power and illumination for 96 tribal hamlets",
+        clientName: "Zilla Parishad, Betul",
+        clientType: "STATE_GOVERNMENT",
+        sector: "Panchayati raj",
+        description:
+          "Autonomous photovoltaic installations at 96 tribal hamlets beyond the distribution network, with community operator training in each hamlet.",
+        outcome:
+          "All 96 hamlets had usable power after dark for the first time; trained operators handled 61 per cent of faults without a technician visit.",
+        contractValueInr: 41_500_000,
+        startYear: 2021,
+        endYear: 2023,
+      },
+      {
+        title: "Storage replacement programme across 7,100 installed units",
+        clientName: "Maharashtra Energy Development Agency",
+        clientType: "STATE_GOVERNMENT",
+        sector: "Energy",
+        description:
+          "A standing obligation to replace electrochemical storage across the installed base on a condition-assessed schedule rather than a fixed one.",
+        outcome:
+          "Mean functioning life of an installation extended from 3.1 to 8.4 years across the programme.",
+        contractValueInr: 88_000_000,
+        startYear: 2022,
+        endYear: null,
+      },
+    ],
+    credentials: [
+      {
+        kind: "CERTIFICATION",
+        name: "ISO 9001:2015",
+        issuingAuthority: "TUV Rheinland India",
+      },
+      {
+        kind: "QUALITY_STANDARD",
+        name: "IS 16221 photovoltaic module conformity",
+        issuingAuthority: "Bureau of Indian Standards",
+      },
+      {
+        kind: "EMPANELMENT",
+        name: "Empanelled supplier, decentralised renewable systems",
+        issuingAuthority: "Maharashtra Energy Development Agency",
+      },
+      {
+        kind: "EMPANELMENT",
+        name: "GeM registered seller",
+        issuingAuthority: "Government e-Marketplace",
+      },
+    ],
+  },
 ];

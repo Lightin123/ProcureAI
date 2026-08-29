@@ -5,6 +5,7 @@ import { loadConfig } from "../src/config/env.js";
 import { SEEDED_ORGANIZATIONS, SEEDED_USERS } from "../src/config/seedIdentity.js";
 import { SEEDED_OPPORTUNITIES } from "../src/config/seedOpportunities.js";
 import { SEEDED_VENDORS } from "../src/config/seedVendors.js";
+import { SEEDED_DECOMPOSED_PROJECTS } from "../src/config/seedWorkPackages.js";
 import { closePool, query } from "../src/db/pool.js";
 import { createProfile, updateProfileValues } from "../src/repositories/vendorProfiles.js";
 import {
@@ -292,6 +293,140 @@ async function seedOpportunities(organizationIds: Map<string, string>): Promise<
   }
 }
 
+/**
+ * A confirmed, decomposed project so work-package vendor matching has something
+ * to run against on a fresh database.
+ *
+ * Idempotent in the same way the other seeders are: the project is upserted on
+ * its reference number, and its requirements and work packages are replaced
+ * wholesale so a re-run cannot accumulate duplicates. Deleting the packages
+ * cascades to their match runs and results, which is correct — a stored ranking
+ * describes a package that no longer exists.
+ */
+async function seedWorkPackages(organizationIds: Map<string, string>): Promise<void> {
+  for (const project of SEEDED_DECOMPOSED_PROJECTS) {
+    const organizationId = organizationIds.get(project.organizationCode);
+    if (organizationId === undefined) {
+      throw new Error(`Unknown organization ${project.organizationCode}.`);
+    }
+
+    const official = await query<{ id: string }>(
+      `SELECT id FROM users
+       WHERE organization_id = $1 AND role = 'GOVERNMENT_OFFICIAL'
+       ORDER BY created_at LIMIT 1`,
+      [organizationId],
+    );
+
+    const officialId = official.rows[0]?.id;
+    if (officialId === undefined) {
+      throw new Error(`No government official seeded for ${project.organizationCode}.`);
+    }
+
+    const inserted = await query<{ id: string }>(
+      `INSERT INTO procurement_projects
+         (reference_number, organization_id, created_by, title, problem_description, status)
+       VALUES ($1, $2::uuid, $3::uuid, $4, $5, 'WORK_PACKAGES_CONFIRMED')
+       ON CONFLICT (reference_number) DO UPDATE
+         SET title               = EXCLUDED.title,
+             problem_description = EXCLUDED.problem_description,
+             status              = EXCLUDED.status,
+             updated_at          = now()
+       RETURNING id`,
+      [
+        project.referenceNumber,
+        organizationId,
+        officialId,
+        project.title,
+        project.problemDescription,
+      ],
+    );
+
+    const projectId = inserted.rows[0]?.id;
+    if (projectId === undefined) {
+      throw new Error(`Failed to seed project ${project.referenceNumber}.`);
+    }
+
+    await query(`DELETE FROM work_packages WHERE project_id = $1`, [projectId]);
+    await query(`DELETE FROM project_requirements WHERE project_id = $1`, [projectId]);
+
+    let confirmedCount = 0;
+
+    for (const workPackage of project.workPackages) {
+      const packageRow = await query<{ id: string }>(
+        `INSERT INTO work_packages
+           (project_id, package_number, title, description, scope, complexity, priority,
+            estimated_category, deliverables, status, source, display_order, decided_by, decided_at)
+         VALUES ($1, $2, $3, $4, $5, $6::work_package_complexity, $7::work_package_priority,
+                 $8, $9::text[], $10::work_package_status, 'MANUAL', $11, $12,
+                 CASE WHEN $10 = 'CONFIRMED' THEN now() ELSE NULL END)
+         RETURNING id`,
+        [
+          projectId,
+          workPackage.packageNumber,
+          workPackage.title,
+          workPackage.description,
+          workPackage.scope,
+          workPackage.complexity,
+          workPackage.priority,
+          workPackage.estimatedCategory,
+          workPackage.deliverables,
+          workPackage.status,
+          workPackage.displayOrder,
+          officialId,
+        ],
+      );
+
+      const workPackageId = packageRow.rows[0]?.id;
+      if (workPackageId === undefined) {
+        throw new Error(`Failed to seed ${workPackage.packageNumber}.`);
+      }
+
+      // Requirements belong to the project and are linked to the package
+      // through the junction, exactly as the decomposition flow creates them.
+      for (const requirement of workPackage.requirements) {
+        const requirementRow = await query<{ id: string }>(
+          `INSERT INTO project_requirements
+             (project_id, kind, category, text, source, status, decided_by, decided_at)
+           VALUES ($1, $2::requirement_kind, $3::requirement_category, $4,
+                   'MANUAL', 'ACCEPTED', $5, now())
+           RETURNING id`,
+          [projectId, requirement.kind, requirement.category, requirement.text, officialId],
+        );
+
+        const requirementId = requirementRow.rows[0]?.id;
+        if (requirementId === undefined) continue;
+
+        await query(
+          `INSERT INTO work_package_requirements (work_package_id, requirement_id)
+           VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [workPackageId, requirementId],
+        );
+      }
+
+      if (workPackage.status === "CONFIRMED") confirmedCount += 1;
+    }
+
+    const history = await query<{ id: string }>(
+      `SELECT id FROM project_stage_history
+       WHERE project_id = $1 AND to_status = 'WORK_PACKAGES_CONFIRMED'`,
+      [projectId],
+    );
+
+    if (history.rows.length === 0) {
+      await query(
+        `INSERT INTO project_stage_history (project_id, from_status, to_status, actor_id, reason)
+         VALUES ($1, 'WORK_PACKAGES_UNDER_REVIEW', 'WORK_PACKAGES_CONFIRMED', $2, $3)`,
+        [projectId, officialId, "Work packages confirmed (demonstration data)."],
+      );
+    }
+
+    console.log(
+      `project       ${project.referenceNumber.padEnd(38)} ` +
+        `${project.workPackages.length} work package(s), ${confirmedCount} confirmed`,
+    );
+  }
+}
+
 async function run(): Promise<void> {
   // Populates process.env from apps/api/.env before SEED_DEMO_PASSWORD is read.
   loadConfig();
@@ -307,6 +442,9 @@ async function run(): Promise<void> {
   console.log("");
 
   await seedOpportunities(organizationIds);
+  console.log("");
+
+  await seedWorkPackages(organizationIds);
   console.log("");
 
   console.log(

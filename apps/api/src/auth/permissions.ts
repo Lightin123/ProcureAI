@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   "workflow:transition",
   "workpackage:read",
   "workpackage:manage",
+  "vendor:matching:read",
+  "vendor:shortlist:manage",
   "organization:read",
   "system:status:read",
   "user:read",
@@ -56,14 +58,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "workflow:transition",
     "workpackage:read",
     "workpackage:manage",
+    "vendor:matching:read",
+    "vendor:shortlist:manage",
     "organization:read",
     "system:status:read",
     "opportunity:publish",
   ],
+  // Oversight may read a ranking but not act on it: shortlisting a supplier is
+  // a procurement act, and it stays with the official who is accountable for
+  // the decision (D60).
   ADMIN: [
     "project:read",
     "requirements:read",
     "workpackage:read",
+    "vendor:matching:read",
     "organization:read",
     "system:status:read",
     "user:read",

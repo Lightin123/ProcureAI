@@ -1,21 +1,26 @@
 # Vendor / Startup Discovery and Matching
 
-**Status:** Partially implemented. Opportunity-level deterministic lexical
-matching exists today. Work-package-level hybrid matching — the design
-described in most of this document — is the current development priority
-and is **not yet implemented**. See
+**Status:** Implemented. Work-package-level hybrid matching — the design
+described in most of this document — is built, tested, and in use
+(`apps/api/src/matching/`). The earlier opportunity-level deterministic
+lexical matching remains, serving a different audience (a vendor browsing
+opportunities) rather than being superseded. See
 [../development-roadmap.md](../development-roadmap.md) Milestone 6.
 
 ## Current Implementation
 
-What exists today, in `apps/api/src/vendor/matching.ts` and the
+Two matching capabilities exist side by side. They answer different
+questions for different users and neither replaces the other.
+
+### Opportunity-Level Matching (vendor-facing)
+
+What a vendor sees, in `apps/api/src/vendor/matching.ts` and the
 `GET /api/v1/vendor/opportunities` / `GET /api/v1/vendor/dashboard`
 endpoints:
 
 - Matching operates at **procurement project ("opportunity") granularity**
   — a vendor is scored against a whole published project, not against an
-  individual work package within it. There is no work-package-level
-  matching yet.
+  individual work package within it.
 - Matching is **deterministic lexical overlap only** — no embeddings, no
   vector search, no semantic component. Both the opportunity's text
   (title, published summary, accepted requirement text) and the vendor's
@@ -32,124 +37,210 @@ endpoints:
   relevance, so a verified national supplier of the wrong thing cannot
   outrank a local supplier of the right thing.
 - Every score returns matched terms, unmatched terms, and per-component
-  detail — this is already explainable, just not yet semantic or
-  package-scoped.
-- **Eligibility is not a separate gate.** A vendor with no relevant
-  capability still receives a (low) score rather than being filtered out
-  before scoring; there is no hard eligibility pass/fail step today. See
-  [Eligibility Filtering](#eligibility-filtering-planned) below for what
-  that gate will need to check once it exists.
-- The vendor capability profile already produces the artifact the next
-  phase needs: on every profile write, the server derives a
-  natural-language **capability document** (structured answers resolved to
-  their labels, plus the vendor's own free-text descriptions preserved
-  verbatim) and a normalized **capability keyword set**. This is what an
-  embedding step would embed — it does not yet exist, but nothing about
-  the profile data model needs to change to add it.
+  detail.
+- **Eligibility is not a separate gate here.** A vendor with no relevant
+  capability still receives a (low) score rather than being filtered out.
+  This is appropriate for a discovery feed — a vendor browsing
+  opportunities is not being excluded from anything — but it is not how
+  the official-facing pipeline works.
 
-This is a genuine, useful precursor — it lets a vendor discover
-plausible-fit opportunities and lets a department see who has expressed
-interest — but it is **not** what FR4 in
-[../product/requirements.md](../product/requirements.md) specifies (which
-is package-level and semantic), and it should not be described as
-"vendor discovery" in the FR4 sense in product conversations.
+This lets a vendor discover plausible-fit opportunities and lets a
+department see who has expressed interest. It is **not** what FR4 in
+[../product/requirements.md](../product/requirements.md) specifies, and it
+should not be described as "vendor discovery" in the FR4 sense.
 
-## Next Phase — Work Package to Vendor Matching
+### Work-Package-Level Hybrid Matching (official-facing)
+
+What an official runs, in `apps/api/src/matching/` — this is FR4. It is
+described in full below.
+
+## Work Package to Vendor Matching
 
 ### Purpose
 
 Given a **confirmed work package** — not a whole project — identify vendors
 whose capabilities are relevant to that specific package, combining
-AI-driven semantic matching with deterministic structured filtering, per
-FR4 in [../product/requirements.md](../product/requirements.md).
+semantic retrieval with deterministic structured filtering, per FR4 in
+[../product/requirements.md](../product/requirements.md).
 
-### Matching Should Consider
+### Matching Considers
 
-- Work package title and description.
-- Required products or services.
-- Required capabilities, technical and non-technical.
+- Work package title, description, scope, and deliverables.
+- The `project_requirements` linked to the package, plus light project
+  context.
+- Required products or services, and required capabilities.
 - Industry, sector, and domain specialization.
 - Delivery requirements and geographic coverage.
-- Capacity.
+- Capacity, expressed as declared contract value brackets.
 - Certifications and compliance requirements.
 - Previous relevant experience.
-- Engagement model and number of concurrent engagements the vendor can
-  sustain.
-- Service levels and delivery commitments.
 - The vendor's capability narrative, structured products/services,
-  previous projects, and credentials — all of which the Milestone 6
-  onboarding work already collects (see
+  previous projects, and credentials — all collected by the Milestone 6
+  onboarding work (see
   [../architecture/database.md](../architecture/database.md)).
 
-### Planned Pipeline
+### The Pipeline
 
 ```
-Work Package
+Confirmed Work Package
     |
     v
-Requirement Normalization
-    |
+Requirement Normalization        normalization.ts
+    |                              -> semantic document + weighted terms
     v
-Structured Eligibility Filtering
+Hybrid Candidate Retrieval       retrieval.ts
     |
-    v
-Semantic Candidate Retrieval
-    |
-    v
-Deterministic Relevance Scoring
-    |
-    v
-AI-Assisted Explanation
-    |
-    v
-Ranked Vendor Recommendations
+    +---------------+---------------+
+    v                               v
+Lexical Retrieval             Semantic Retrieval
+(GIN keyword overlap)         (embedding -> pgvector/HNSW -> top-K)
+    |                               |
+    +---------------+---------------+
+                    v
+            Candidate Pool           unioned, deduplicated
+                    |
+                    v
+      Deterministic Eligibility Gate  eligibility.ts   hard pass/fail
+                    |
+                    v
+      Multi-Factor Ranking            ranking.ts       eligible only
+                    |
+                    v
+      Evidence-Derived Explanation    presentation.ts
+                    |
+                    v
+      Government Official             shortlist or set aside
 ```
 
-**Requirement Normalization.** A work package's title, description, scope,
-and deliverables are turned into the same normalized term/entity form the
-vendor capability document already produces, so both sides of the match are
-expressed comparably before either filtering or retrieval runs.
+Retrieval runs before the gate, not after it. The gate needs the
+supplier's full record — credentials and their expiry dates, operating
+states, stated contract values — and loading that for every supplier on
+the platform in order to discard most of them would be the full-table scan
+retrieval exists to avoid. Running it over the candidate pool instead
+reaches the same verdict for every supplier who could have been
+recommended, because a supplier neither half retrieved was never going to
+be ranked. What matters for correctness is that the gate sits between
+retrieval and ranking, so nothing that fails it can be scored.
 
-**Structured Eligibility Filtering.** A hard, deterministic gate applied
-*before* any similarity computation — see
-[Eligibility Filtering](#eligibility-filtering-planned) below. Vendors that
-fail eligibility are excluded from the candidate pool entirely; they are
-not scored, ranked, or shown, though a rejected vendor's profile remains
-visible to the official on request for context (e.g. to understand why the
-candidate pool is thin).
+Each stage is a separate module and each is unit-testable independently —
+normalization, eligibility and ranking are pure functions of their inputs
+and need no database (decision **D63**). `pipeline.ts` composes them.
 
-**Semantic Candidate Retrieval.** Once pgvector is integrated (see
-[rag-and-semantic-search.md](rag-and-semantic-search.md)), the normalized
-work package is embedded and compared against stored vendor capability
-embeddings via similarity search, returning a candidate pool that a purely
-lexical pass would miss when a vendor describes the same capability in
-different words. This runs *alongside* the deterministic lexical matching
-already implemented, not instead of it — see
-[rag-and-semantic-search.md](rag-and-semantic-search.md) for why hybrid
-retrieval, not embeddings alone, is the intended architecture.
+**Requirement Normalization** (`normalization.ts`,
+`NORMALIZATION_VERSION = 1`). Builds one `NormalizedWorkPackage` from the
+work package, its linked `project_requirements`, and light project
+context. It produces four things: a natural-language `document` (the full
+statement of the package, for display and audit), a `semanticDocument`
+(the subject matter alone — this is what gets embedded, decision **D71**),
+a `terms` list, and `termWeights` — a weight in [0,1] per term, assigned
+by the field the term came from:
 
-**Deterministic Relevance Scoring.** The existing multi-component scoring
-approach (already proven at opportunity level) extends to package-level
-inputs and the combined lexical + semantic candidate pool. See
-[evaluation-and-ranking.md](evaluation-and-ranking.md) for how relevance
-scoring and ranking relate, and why they stay separate concepts.
+| Source field | Weight |
+|---|---|
+| Work package title | 1.00 |
+| Deliverable | 0.85 |
+| Category | 0.80 |
+| Description | 0.60 |
+| Linked requirement text | 0.60 |
+| Scope | 0.45 |
+| Project context | 0.25 |
 
-**AI-Assisted Explanation.** An LLM call may turn the structured matching
-evidence (which terms matched, which eligibility checks passed, which
-score components contributed) into a readable explanation for the official.
-This step **never determines eligibility or overrides the deterministic
-ranking** — it narrates evidence that already exists; see
-[evaluation-and-ranking.md](evaluation-and-ranking.md) for this as a
-trust/auditability principle, not just a UX nicety.
+A term appearing in several fields takes its **highest** weight rather
+than a sum, so repeating a word throughout a long paragraph cannot
+outweigh naming it in the title. Normalization also extracts the
+package's mandatory certifications, required delivery regions, and rupee
+contract value ceiling — the inputs the eligibility gate consumes.
 
-**Ranked Vendor Recommendations.** The output an official acts on:
-ranked, eligible vendors per work package, each with its explanation —
-feeding directly into Milestone 7 (shortlisting and invitation).
+The `semanticDocument` is the title, category, description, scope,
+deliverables, and only the FUNCTIONAL, NON_FUNCTIONAL and OTHER linked
+requirements. **Compliance, budget and timeline clauses are deliberately
+left out**: they are near-identical from one package to the next, so
+averaging them into the vector pulls every package towards the same point,
+and they are already enforced structurally by the eligibility gate rather
+than by similarity. The supplier side has the same split —
+`vendor_profiles.semantic_document` alongside the full
+`capability_document`. See
+[rag-and-semantic-search.md](rag-and-semantic-search.md#the-semantic-document).
 
-## Eligibility Filtering (Planned)
+**Deterministic Eligibility Gate** (`eligibility.ts`,
+`ELIGIBILITY_VERSION = 1`). A hard pass/fail gate applied to the candidate
+pool, *before* any scoring — see
+[Eligibility Filtering](#eligibility-filtering) below.
 
-Eligibility and relevance are different questions and must not be
-collapsed into one score:
+**Hybrid Candidate Retrieval** (`retrieval.ts`). The lexical and semantic
+halves run **independently** and their results are unioned and
+deduplicated; neither half filters the other. Each candidate records which
+half or halves found it in `retrievalSources` (`"LEXICAL"`, `"SEMANTIC"`,
+or both), so an official can see how a supplier surfaced. Both halves draw
+on the normalized terms with weight **>= 0.45**, capped at **40 terms**.
+
+- **Lexical.** A GIN-indexed array overlap of
+  `vendor_profiles.capability_keywords && terms`, requiring at least **2**
+  overlapping strong terms — one shared word is coincidence, not a match
+  — returning the top **60**.
+- **Semantic.** The package's semantic document is embedded — by default
+  `BAAI/bge-small-en-v1.5`, a sentence encoder running locally on CPU,
+  producing **384**-dimension vectors (decision **D70**) — and compared
+  against the stored supplier vectors with a pgvector cosine search
+  (`embedding <=> query`), returning the top **60**. The minimum
+  similarity is **calibrated per embedding model** (decision **D72**):
+  **0.65** for the current encoder, 0.35 for the concept-model fallback,
+  0.6 for a model nobody has measured. Cosine does not mean the same thing
+  across models, so it cannot be one constant. See
+  [rag-and-semantic-search.md](rag-and-semantic-search.md).
+
+pgvector is optional (decision **D64**). Where the extension is absent the
+semantic half is skipped, the run proceeds lexical-only, and the UI shows
+a visible warning rather than silently returning a narrower result.
+
+**Multi-Factor Ranking** (`ranking.ts`, `RANKING_VERSION = 1`). Fully
+deterministic — no LLM participates in scoring. Seven weighted dimensions,
+detailed in
+[evaluation-and-ranking.md](evaluation-and-ranking.md#part-1--vendor-ranking-per-work-package-implemented).
+
+**Evidence-Derived Explanation** (`presentation.ts`). Explanations are
+generated **from stored data only** — no model call is involved anywhere
+in this stage. Every strength and gap line is derived from a value read
+out of the database and is quoted alongside that value, so an official (or
+an auditor) can trace any sentence back to the record that produced it.
+This is stricter than the "AI-assisted explanation" this document
+originally planned, and better: there is no narration layer that could
+drift from the evidence.
+
+**Ranked Vendor Recommendations.** Each run is persisted with its
+provenance and its exclusions (decision **D68**), so a ranking an official
+acted on stays interpretable after the weights or the embedding model have
+moved on.
+
+### API and UI
+
+Endpoints live under
+`/api/v1/work-packages/:workPackageId/vendor-matches`:
+
+| Route | Purpose |
+|---|---|
+| `GET` | Read the last stored run |
+| `POST` | Run or recalculate matching |
+| `GET /:vendorProfileId` | One supplier in the context of this package |
+| `POST` / `DELETE` `/shortlist` | Add to / remove from the shortlist |
+
+Permissions are `vendor:matching:read` (`GOVERNMENT_OFFICIAL` and `ADMIN`)
+and `vendor:shortlist:manage` (`GOVERNMENT_OFFICIAL` only — shortlisting
+is a procurement act, per D69). Vendors hold neither. Cross-organization
+access returns 404.
+
+The officials' UI is `apps/web/src/pages/WorkPackageVendorMatchingPage.tsx`
+at `projects/:id/work-packages/:workPackageId/suppliers`, reached from a
+"Find Suitable Vendors" button shown only on `CONFIRMED` packages. It
+presents ranked supplier cards with per-dimension bars, a why/gaps
+breakdown, an inspectable excluded-suppliers section, a side-by-side
+comparison modal (up to four suppliers), a supplier detail modal, and
+shortlisting.
+
+## Eligibility Filtering
+
+Eligibility and relevance are different questions and are not collapsed
+into one score:
 
 | Concept | Question it answers |
 |---|---|
@@ -161,68 +252,98 @@ A vendor can be perfectly eligible and a poor relevance match (a verified,
 compliant road contractor is eligible for a road package and irrelevant to
 a vaccine cold-chain package). A vendor can look highly relevant by
 keyword overlap and still be ineligible (missing a mandatory certification,
-wrong jurisdiction, unverified profile). Only vendors that pass eligibility
-are scored for relevance and ranked; eligibility failure is a hard
-exclusion, not a scoring penalty.
+wrong jurisdiction). Eligibility failure is a hard exclusion, not a scoring
+penalty — an ineligible supplier is not ranked into the recommendations
+however well they would have scored.
 
-Planned eligibility criteria:
+`checkEligibility` returns
+`{ eligible, passedChecks[], failedChecks[], warnings[] }`. Each check
+carries two fields: the `requirement` (quoted from the source clause that
+imposed it) and the `evidence` (read from the supplier's own record), so
+every pass and every failure states what was asked and what was found.
 
-- Industry/sector compatibility with the work package.
-- Required certifications present and, where the work package demands it,
-  verified.
-- Compliance requirements met.
-- Geographic eligibility (the vendor's declared operating states cover the
-  work package's delivery location).
-- Capacity constraints (declared minimum/maximum project value brackets,
-  concurrent-engagement limits) not already exceeded.
-- Delivery capability consistent with what the package requires.
-- Organization status active and profile not in a rejected state.
-- Vendor **verification status** — whether an unverified vendor is
-  excluded outright or included with a lower ceiling is an open product
-  decision, not yet made.
-- Vendor profile completeness above a minimum threshold.
-- Any domain qualification the work package marks as mandatory rather than
-  preferred.
-- Any other work-package-specific mandatory condition an official sets.
+The implemented checks:
 
-None of this exists yet. The current implementation folds a version of
-several of these signals (verification state, government-scale readiness,
-completion percentage) into the *relevance* score's credibility component
-rather than gating on them — that is a known simplification to correct
-when this layer is built, not the intended long-term design.
+| Check | What it verifies |
+|---|---|
+| `PROFILE_ASSESSABLE` | Profile completion is at least 40% — below that there is not enough data to assess anything |
+| `VERIFICATION_NOT_REJECTED` | The supplier's verification is not in a rejected state |
+| `MANDATORY_CERTIFICATION` | Each certification the package mandates is held |
+| `CREDENTIAL_VALIDITY` | A mandatory credential that has expired counts as not held |
+| `DELIVERY_REGION` | The supplier's declared operating regions cover the package's required regions |
+| `CONTRACT_VALUE_CEILING` | The package's rupee value falls within the supplier's declared bracket |
 
-## Vendor Ranking Per Work Package (Planned)
+Three rules govern how these behave, and each exists to prevent a specific
+wrong exclusion:
 
-See [evaluation-and-ranking.md](evaluation-and-ranking.md) for the full
-design of the ranking engine, the signals it combines, and the
-explainability requirement each recommendation must satisfy.
+- **A dimension the package does not constrain produces no check at all.**
+  An absent constraint is never reported as satisfied — a package that
+  names no certification does not generate a passed `MANDATORY_CERTIFICATION`
+  line, because reporting an unasked question as answered would inflate the
+  apparent rigour of the gate.
+- **Certification requirements are extracted only from clauses carrying an
+  obligation marker** (must, shall, mandatory, required, and similar). A
+  descriptive mention — "a quality system comparable to ISO 9001" — cannot
+  exclude anyone. Excluding a supplier on an obligation the source text
+  never imposed is the most damaging error this gate could make.
+- **`UNVERIFIED` and `PENDING` suppliers are admitted, with a warning.**
+  Only `REJECTED` is a hard exclusion. A supplier who has not yet been
+  reached by an administrator has not failed anything; the official sees
+  the verification state and decides. This resolves what this document
+  previously listed as an open product decision.
+
+## Vendor Ranking Per Work Package
+
+See [evaluation-and-ranking.md](evaluation-and-ranking.md) for the seven
+ranking dimensions, their weights, the relevance-scaling mechanic, the
+band thresholds, and the explainability requirement each recommendation
+satisfies.
 
 ## Why Hybrid, Not Semantic Search Alone
 
 - Semantic search alone risks surfacing vendors that are topically similar
   but fail hard constraints (wrong jurisdiction, missing mandatory
-  certification) — which is exactly why eligibility filtering is a
-  separate, prior stage, not folded into the similarity score.
-- Lexical/structured filtering alone (what exists today) risks missing
-  vendors whose capabilities are described differently than the work
-  package's wording — the gap semantic search closes.
-- Combining both keeps matching interpretable: an official can see which
-  candidates matched lexically vs. semantically vs. both, rather than a
-  single opaque similarity number.
+  certification) — which is why eligibility filtering is a separate, prior
+  stage, not folded into the similarity score.
+- Lexical/structured filtering alone risks missing vendors whose
+  capabilities are described differently than the work package's wording —
+  the gap semantic search closes.
+- Combining both keeps matching interpretable: `retrievalSources` records
+  which candidates matched lexically, semantically, or both, rather than
+  presenting a single opaque similarity number.
 
-## Explicitly Not Yet Decided
+## Not Built — Future Work
 
-- Exact ranking formula for combining lexical overlap, semantic
-  similarity, and the other relevance signals listed above.
-- Whether an unverified vendor is eligibility-excluded or included at a
-  lower ranking ceiling.
-- Embedding model, vector dimensionality, and pgvector indexing strategy
-  — see [rag-and-semantic-search.md](rag-and-semantic-search.md).
-- How multi-package vendor allocation (one vendor across several packages,
-  capacity limits, minimizing vendor count vs. preferring specialists)
-  composes with per-package ranking — see
-  [../development-roadmap.md](../development-roadmap.md) Milestone 11.
-  Deliberately deferred until single-package matching is reliable.
+The matching pipeline ends at a ranked, explained, shortlistable candidate
+list. Everything downstream of that is future work:
+
+- **Vendor invitation and the engagement workflow** (Milestone 7).
+  Shortlisting exists today only as a minimal seam — a table, add/remove
+  endpoints, and a list in the UI (decision **D69**). Nothing invites a
+  shortlisted supplier or notifies them.
+- **RFI issue and structured vendor responses** (Milestone 8).
+- **Document intelligence and response evaluation** (Milestone 9) — see
+  Part 2 of [evaluation-and-ranking.md](evaluation-and-ranking.md).
+- **Vendor gap analysis and procurement analytics** (Milestone 10).
+- **Multi-package vendor allocation** — one vendor across several
+  packages, capacity limits, minimizing vendor count vs. preferring
+  specialists (Milestone 11). Deliberately deferred until single-package
+  matching is proven.
+- **Advanced semantic optimization** — learned ranking, query expansion,
+  reranking after retrieval (Milestone 11).
+
+Open questions that remain, rather than unbuilt features:
+
+- Whether the ranking weights should be fixed, configurable per project,
+  or configurable by an administrative role — see
+  [evaluation-and-ranking.md](evaluation-and-ranking.md).
+- Whether the per-model semantic calibration holds at a registry size
+  larger than the demo's. The current thresholds were measured against
+  nine suppliers, and the encoder itself is a general-purpose English
+  model, not one tuned on Indian procurement text (U14, D72).
+- Whether a stored ranking should be re-run automatically when supplier
+  data changes; today a run is explicit and its result is stored, so a
+  displayed ranking can be out of date without saying so (U35).
 
 ## Related Documents
 

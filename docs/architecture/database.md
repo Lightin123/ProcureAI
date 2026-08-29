@@ -8,10 +8,15 @@ Milestone 6. Migration `001_init.sql` (Milestone 2) created `organizations`,
 review; `004_authentication.sql` (Milestone 5) added real credentials,
 sessions, and roles; `005_vendor_profiles.sql` (Milestone 6) added the
 vendor capability profile, portfolio, document, opportunity-engagement, and
-notification tables. Vendor **matching** (Eligibility Criteria, Candidate
-Evaluations, Evaluation Runs, and the embeddings/pgvector schema below)
-remains conceptual and undesigned — see
-[../ai/vendor-discovery.md](../ai/vendor-discovery.md).
+notification tables; `006_work_package_matching.sql` (Milestone 6, part 2)
+added capability and work-package embeddings, match-run provenance,
+per-supplier match results, and the shortlist;
+`007_semantic_embeddings.sql` (Milestone 6, part 3) narrowed the vector
+columns to the current embedding model's 384 dimensions and added
+`vendor_profiles.semantic_document`. Evaluation of vendor
+**responses** (Evaluation Criteria/Templates, Candidate Evaluations,
+Evaluation Runs over submitted proposals) remains conceptual and undesigned
+— see [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
 
 This document maps the data areas implied by the product requirements and
 architecture. The Implemented Schema section below reflects what actually
@@ -25,10 +30,12 @@ them.
   rather than local (D19).
 - Data access is `pg` with hand-written SQL and plain `.sql` migrations —
   no ORM (D20).
-- The pgvector extension will be used for embeddings-based semantic search.
-  It is **not enabled yet**. It is now the immediate next priority (see
-  [../development-roadmap.md](../development-roadmap.md) Milestone 6, "Next
-  Phase"), not a later-milestone concern as previously framed here.
+- The pgvector extension is used for embeddings-based semantic search, and is
+  **optional** rather than required: migration `006` creates the vector tables
+  only where the extension installs successfully, migration `007` is guarded
+  the same way, and the application detects their absence at runtime and
+  degrades to lexical-only retrieval (D64). See
+  [Embeddings / Vector Search](#embeddings--vector-search).
 - The Express backend (`apps/api`) is the only component with direct
   database access.
 
@@ -96,7 +103,7 @@ Added in Milestone 5 (`apps/api/migrations/004_authentication.sql`):
   timestamps (idle and absolute), revocation, and the requesting user agent
   and IP for audit purposes.
 
-Added in Milestone 6, so far (`apps/api/migrations/005_vendor_profiles.sql`):
+Added in Milestone 6, part 1 (`apps/api/migrations/005_vendor_profiles.sql`):
 
 - `vendor_profiles` — one row per vendor organization: onboarding status
   and verification state; organisation details, business classification,
@@ -104,9 +111,13 @@ Added in Milestone 6, so far (`apps/api/migrations/005_vendor_profiles.sql`):
   innovation-profile columns collected across the onboarding sections;
   completion tracking; and a derived `capability_document` (natural-
   language) plus `capability_keywords` (normalized array), rebuilt on every
-  write — the artifact semantic search will embed once
-  [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md) is
-  implemented.
+  write. Both are now consumed by matching: `capability_keywords` is the
+  lexical half of retrieval (it needs no schema of its own and is already
+  GIN-indexed), and `capability_document` is what an official and an LLM
+  read and the source the keyword set is derived from. The text actually
+  embedded into `vendor_capability_embeddings` is a third derived column,
+  `semantic_document`, added by migration `007` below — see
+  [../ai/rag-and-semantic-search.md](../ai/rag-and-semantic-search.md).
 - `vendor_offerings`, `vendor_experience`, `vendor_credentials` — repeatable
   entities under a vendor profile: products/services, past projects,
   certifications.
@@ -123,11 +134,90 @@ Added in Milestone 6, so far (`apps/api/migrations/005_vendor_profiles.sql`):
   portal is a distinct, explicit act from confirming requirements
   internally, not a side effect of workflow status.
 
-Not yet added: any table for eligibility criteria, candidate evaluations,
-evaluation/recommendation runs, or vendor capability embeddings — these
-remain in [Conceptual Data Areas](#conceptual-data-areas-not-yet-designed-in-detail)
-below, now narrowed to specifically the matching/evaluation layer rather
-than vendors in general.
+Added in Milestone 6, part 2
+(`apps/api/migrations/006_work_package_matching.sql`) — work-package-level
+vendor matching:
+
+- `vendor_capability_embeddings` — one row per vendor profile, keyed on
+  `vendor_profile_id` (primary key, cascading from `vendor_profiles`):
+  `source_hash` (SHA-256 of the exact text embedded), `embedding_model`,
+  `embedding_version`, `dimensions`, `embedding vector(384)` (originally
+  `vector(1024)`; narrowed by migration `007` below), and timestamps.
+  Indexed by `vendor_capability_embeddings_vector_idx` USING **hnsw**
+  (`embedding vector_cosine_ops`) (D65). Created only where pgvector is
+  available (D64).
+- `work_package_embeddings` — the same shape keyed on `work_package_id`
+  (cascading from `work_packages`), plus `normalization_version`, since the
+  embedded text is produced by the normalization stage rather than taken
+  verbatim from the row. No vector index: work-package vectors are read one
+  at a time by primary key, never searched.
+- `work_package_match_runs` — one row per "find suitable vendors" action,
+  holding everything needed to explain the result later (D68):
+  `work_package_id`, `project_id`, `requested_by`; the `strategy_version`,
+  `normalization_version`, `eligibility_version`, `ranking_version` and the
+  `weights` (jsonb) in force; `semantic_enabled`, `embedding_model`,
+  `embedding_dimensions`; and the run's counters —
+  `lexical_candidates`, `semantic_candidates`, `pool_size`,
+  `eligible_count`, `excluded_count`, `duration_ms`. Indexed on
+  `(work_package_id, created_at DESC)`, which is how the last run is found.
+- `work_package_match_results` — one row per **assessed** supplier per run,
+  not per recommended supplier: `run_id` (cascading), `work_package_id`,
+  `vendor_profile_id`, `eligible`, `rank_position` (null for an excluded
+  supplier, which is still stored), `overall_score`, the full
+  `dimension_scores` array (`{key, label, score, weight, detail}`),
+  `eligibility` and `evidence` (jsonb), the `retrieval_sources` that found
+  the supplier, and `semantic_similarity`. Unique on
+  `(run_id, vendor_profile_id)`.
+- `work_package_shortlist` — deliberately minimal (D69): `work_package_id`,
+  `vendor_profile_id`, `source_run_id` (the run on screen at the time; ON
+  DELETE SET NULL, so a discarded run does not remove the decision),
+  `rank_at_shortlist`, `score_at_shortlist`, `reason`, `added_by`,
+  `created_at`. Unique on `(work_package_id, vendor_profile_id)`. The rank
+  and score are read server-side from the stored run, never accepted from a
+  request body.
+
+Added in Milestone 6, part 3
+(`apps/api/migrations/007_semantic_embeddings.sql`) — the consequences of
+replacing the deterministic concept embedding model with a real sentence
+encoder, `BAAI/bge-small-en-v1.5` (D70):
+
+- `vendor_profiles.semantic_document` — a third derived text column
+  alongside `capability_document` and `capability_keywords`, holding the
+  capability-bearing prose alone: headline, capability summary, problem
+  solved, value proposition, differentiators, capabilities and expertise,
+  domains and sectors, offerings, past engagements, and the
+  industry-specific answers. It is **separate from `capability_document`
+  because the two are read by different things and want different content**
+  (D71). A sentence encoder reads a fixed window and averages over what it
+  finds, so the legal name, registration numbers, address, contact block
+  and delivery-model enums in the full document compete with the capability
+  prose for the same vector — and being near-identical across suppliers,
+  they pull every vector towards the same point. The full document is
+  unchanged and still serves display, LLM reading, and keyword derivation.
+  The omitted fields are not lost: they are structured columns the
+  eligibility gate and the ranking dimensions read directly.
+- `vendor_capability_embeddings.embedding` and
+  `work_package_embeddings.embedding` move from `vector(1024)` to
+  **`vector(384)`**, the encoder's native width, and the HNSW index is
+  dropped and recreated around the type change. Padding 384 into a
+  1024-wide column would have preserved cosine and avoided the migration,
+  but it leaves the schema asserting a width no model produces (D70).
+- **Stored vectors are TRUNCATEd, not converted.** A 1024-dimension
+  concept vector has no meaningful projection into a 384-dimension encoder
+  space, so converting them would be inventing data. They are derived data
+  carrying a recorded source digest, so the next match run regenerates them
+  through the ordinary digest-keyed path (D67) — an absent row and a stale
+  row are already the same code path.
+- The whole migration is guarded and repeatable: it no-ops where pgvector
+  or the embedding tables are absent (D64), and no-ops again where the
+  columns are already 384 wide.
+
+Not yet added: any table for eligibility criteria templates, candidate
+evaluations of vendor **responses**, or evaluation/recommendation runs over
+submitted proposals — these remain in
+[Conceptual Data Areas](#conceptual-data-areas-not-yet-designed-in-detail)
+below, now narrowed to specifically the response-evaluation layer
+(Milestone 9) rather than vendor matching in general.
 
 ## Conceptual Data Areas (Not Yet Designed in Detail)
 
@@ -166,9 +256,10 @@ column design should be inferred from the grouping or ordering.
 
 - **Vendor Organizations** — implemented as `vendor_profiles`: capability
   data, structured classification, capacity, experience, and the derived
-  capability document/keywords described above. The **embeddings** used for
-  semantic search are not yet part of this table — see
-  [Embeddings / Vector Search](#embeddings--vector-search-planned) below.
+  capability document, semantic document and keywords described above. The
+  **embeddings** used for semantic search live in a separate table rather
+  than on this one — see
+  [Embeddings / Vector Search](#embeddings--vector-search) below.
 - **Vendor Memberships / Representatives** — still conceptual, and
   simplified today: one vendor organization currently has exactly one user
   account (the account created at registration), not a set of
@@ -209,34 +300,88 @@ column design should be inferred from the grouping or ordering.
 - **Audit Log** — record of key state-changing actions (see
   [../engineering/security.md](../engineering/security.md)).
 
-### Evaluation and Recommendations
+### Evaluation and Recommendations — Partly Realised for Matching (Milestone 6)
 
-- **Evaluation Criteria / Templates** — reusable definitions of evaluation
-  criteria (e.g. name, description, scoring approach, weight) that can be
-  applied across projects or work packages, rather than being redefined
-  each time. Supports FR7.7's deterministic-vs-AI-assisted split (see
-  [../product/requirements.md](../product/requirements.md)).
-- **Candidate Evaluations / Criterion Results** — a per-candidate evaluation
-  record, decomposed into individual criterion results (score,
-  rationale/evidence, deterministic vs. AI-assisted), which aggregate into
-  an overall evaluation for that candidate.
-- **Evaluation / Recommendation Runs** — a specific execution of evaluation
-  and ranking against a defined set of inputs (candidates), criteria, and
-  weights. Runs exist so that evaluation results are traceable and
-  reproducible, and so that different runs can be compared, rather than a
-  new evaluation silently overwriting the previous one. See
+Three of the four areas below now have a concrete implementation **for
+vendor matching specifically**: ranking suppliers against a confirmed work
+package from their own capability data. None of them is implemented for the
+evaluation of vendor **responses** — scoring what a supplier actually
+submits, against criteria defined for that procurement — which is
+Milestone 9 and remains undesigned.
+
+- **Evaluation Criteria / Templates** — **not implemented.** Reusable
+  definitions of evaluation criteria (e.g. name, description, scoring
+  approach, weight) that can be applied across projects or work packages,
+  rather than being redefined each time. Supports FR7.7's
+  deterministic-vs-AI-assisted split (see
+  [../product/requirements.md](../product/requirements.md)). Matching's
+  ranking dimensions and weights are code-level and versioned per run
+  (`work_package_match_runs.ranking_version` / `weights`), not rows an
+  official can define — a criteria-template table is still future work.
+- **Candidate Evaluations / Criterion Results** — **partly realised** as
+  `work_package_match_results`: a per-supplier record decomposed into
+  individual dimension scores with their weight and supporting evidence,
+  aggregating into an `overall_score`, and carrying the eligibility verdict
+  that gated it. It evaluates a supplier's *profile*, however, not a
+  submitted response, and every score in it is deterministic — there is no
+  AI-assisted criterion result yet.
+- **Evaluation / Recommendation Runs** — **partly realised** as
+  `work_package_match_runs`. A run captures the inputs, versions and weights
+  behind one execution, so results stay traceable and reproducible and a new
+  run never silently overwrites the previous one (D68). Comparison UX across
+  runs is still not designed. See
   [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
-- **Rankings / Recommendations** — the derived, explainable output of a
-  specific Evaluation / Recommendation Run.
+- **Rankings / Recommendations** — **partly realised**: the ordered,
+  explainable output of a matching run is the `rank_position`-bearing subset
+  of `work_package_match_results`, and excluded suppliers are retained in the
+  same table with a null rank so the eligibility gate stays auditable.
+  `work_package_shortlist` records which of those recommendations an official
+  acted on. Vendor invitation, RFI issue and response evaluation are
+  **not** modelled (D69).
 
-## Embeddings / Vector Search (Planned)
+## Embeddings / Vector Search
 
-- Vendor Organization capability data (and possibly requirement text) will
-  be embedded and stored using pgvector for similarity search.
-- Embedding generation is owned by the AI service; the resulting vectors are
-  persisted by the Express backend.
-- Specific embedding model, dimensionality, and indexing strategy (e.g.
-  IVFFlat vs. HNSW) are **unresolved**.
+Implemented in Milestone 6, part 2; the model and vector width were revised in
+part 3. Two vectors are stored, both in their own tables rather than as a
+column on the row they describe — the source rows are read on nearly every
+request and would otherwise carry the vector into all of those reads, and the
+vector is written on a different schedule than its source row.
+
+- **What is stored.** `vendor_capability_embeddings` holds one vector per
+  vendor profile, embedded from the derived `semantic_document`;
+  `work_package_embeddings` holds one vector per work package, embedded from
+  the normalization stage's `semanticDocument`. Neither is embedded from the
+  full document it belongs to (D71). Each row carries the model, the
+  embedding and pipeline versions, the dimensionality, and the digest of the
+  exact text embedded.
+- **Model and dimensionality (D66, D70).** The default is
+  `BAAI/bge-small-en-v1.5`, a sentence encoder run locally on CPU inside the
+  AI service through `fastembed`'s ONNX runtime — no API key, and offline
+  after a one-off model download. The earlier deterministic concept-space
+  model is retained as the offline fallback, and hosted embeddings remain
+  available opt-in; all three sit behind one `EmbeddingProvider` protocol.
+  Vector width is **384**, the encoder's native size. Embedding generation
+  stays owned by the AI service; the resulting vectors are persisted by the
+  Express backend.
+- **Indexing (D65).** HNSW with `vector_cosine_ops` on the vendor capability
+  vectors, chosen over IVFFlat because IVFFlat builds its list structure from
+  the data present at index time and degrades on the small registry this
+  system starts with. The work-package vectors are not indexed: they are read
+  by primary key, one at a time.
+- **Optionality (D64).** The migration attempts `CREATE EXTENSION IF NOT
+  EXISTS vector` inside a `DO $$ ... EXCEPTION WHEN OTHERS THEN RAISE NOTICE
+  ... END $$` guard and creates the two vector tables via `EXECUTE` only when
+  the extension is present. The non-vector matching tables are created
+  unconditionally. At runtime `semanticStorageAvailable()` checks for the
+  tables with `to_regclass(...)`, and retrieval degrades to its lexical half
+  alone when they are absent. A Postgres without pgvector therefore runs every
+  migration and every existing feature.
+- **Lifecycle (D67).** Vectors are regenerated on a **source digest**, not on
+  a write: a row is recomputed only when `source_hash`, the pipeline version,
+  or the `embedding_model` that produced it changes, and the check runs at
+  match time rather than on the profile-save path. A failed regeneration
+  leaves the previous vector in place. Migration `007` relies on exactly this
+  — it clears the stored vectors and lets the next match run rebuild them.
 
 ## AI Suggestions vs. Confirmed State
 
@@ -264,23 +409,23 @@ single global pattern decided here.
 
 ## Explicitly Not Yet Decided
 
-- Detailed table/column schema for eligibility criteria, candidate
-  evaluations, and evaluation/recommendation runs (Milestone 6 next phase
-  and Milestone 9) — see
-  [../ai/vendor-discovery.md](../ai/vendor-discovery.md) and
-  [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
-- Embedding storage schema: dimensionality, indexing strategy (IVFFlat vs.
-  HNSW), and whether embeddings live on `vendor_profiles` directly or in a
-  separate table — see
-  [Embeddings / Vector Search](#embeddings--vector-search-planned).
+- Detailed table/column schema for reusable evaluation criteria/templates and
+  for candidate evaluations of vendor **responses** (Milestone 9) — see
+  [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md). The
+  matching-side equivalents are now built (`work_package_match_runs` /
+  `work_package_match_results`); see
+  [../ai/vendor-discovery.md](../ai/vendor-discovery.md).
 - Whether an unverified vendor's embeddings/matching data are generated and
   stored before verification, or only after.
 - The specific mechanism used to satisfy traceability in
   [AI Suggestions vs. Confirmed State](#ai-suggestions-vs-confirmed-state)
-  for vendor matching and evaluation specifically — the requirements (D28)
-  and work-package patterns exist as precedent but have not been confirmed
-  as the right fit for matching, which produces a *ranking over existing
-  data* rather than *new suggested data* in the same sense.
+  for response **evaluation** specifically. For matching the question is now
+  answered, and neither the requirements (D28) nor the work-package pattern
+  was the answer: matching produces a *ranking over existing data* rather
+  than *new suggested data*, so the mechanism is run provenance (D68) plus a
+  shortlist entry that records the official's own act and the run it was
+  taken from (D69). Whether that generalises to evaluating submitted
+  responses is untested.
 - Retention and comparison UX for multiple Evaluation / Recommendation Runs.
 - Schema for vendor submissions/responses (Milestone 8) and Vendor
   Memberships / Representatives (multiple staff per vendor organization).

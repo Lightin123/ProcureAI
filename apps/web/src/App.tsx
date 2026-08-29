@@ -22,6 +22,7 @@ import { VendorOpportunitiesPage } from "./pages/VendorOpportunitiesPage.js";
 import { VendorOpportunityDetailPage } from "./pages/VendorOpportunityDetailPage.js";
 import { VendorProfilePage } from "./pages/VendorProfilePage.js";
 import { VendorRegisterPage } from "./pages/VendorRegisterPage.js";
+import { WorkPackageVendorMatchingPage } from "./pages/WorkPackageVendorMatchingPage.js";
 
 /** Sends each role to a section it is actually authorised to open. */
 function LandingRedirect() {
@@ -53,6 +54,10 @@ export function App() {
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/requirements" element={<ProjectRequirementsPage />} />
             <Route path="projects/:id/work-packages" element={<ProjectWorkPackagesPage />} />
+            <Route
+              path="projects/:id/work-packages/:workPackageId/suppliers"
+              element={<WorkPackageVendorMatchingPage />}
+            />
           </Route>
 
           <Route element={<RequirePermission permission={ROUTE_PERMISSION.projectCreate} />}>

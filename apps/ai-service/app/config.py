@@ -4,8 +4,19 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderName = Literal["anthropic", "openai_compatible", "stub"]
+EmbeddingProviderName = Literal["local_onnx", "local_concept", "openai_compatible"]
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# The width of the stored vector column, and the native width of the default
+# model. Changing it requires a migration and a full re-embed, so it is a
+# constant rather than something the environment can quietly disagree with the
+# database about.
+DEFAULT_EMBEDDING_DIMENSIONS = 384
+
+# A quantised ONNX build of BAAI/bge-small-en-v1.5: a real sentence encoder,
+# 384-dimensional, ~90 MB, CPU-only, downloaded once and cached.
+DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 class Settings(BaseSettings):
@@ -28,6 +39,17 @@ class Settings(BaseSettings):
     ai_max_tokens: int = 3_000
     ai_max_attempts: int = 2
 
+    # Embeddings. Deliberately configured independently of the analysis
+    # provider: reasoning and retrieval are different capabilities, and the
+    # Anthropic provider that serves analysis has no embeddings API at all.
+    # Defaults to the local model so semantic retrieval works with no
+    # credentials and costs nothing per match.
+    embedding_provider: EmbeddingProviderName | None = None
+    embedding_api_key: str | None = None
+    embedding_base_url: str | None = None
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    embedding_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS
+
     request_timeout_seconds: float = 55.0
     host: str = "127.0.0.1"
     port: int = 8000
@@ -42,6 +64,20 @@ class Settings(BaseSettings):
         if self.anthropic_api_key:
             return "anthropic"
         return "stub"
+
+    @property
+    def resolved_embedding_provider(self) -> EmbeddingProviderName:
+        """Hosted embeddings are opt-in; the local encoder is the default.
+
+        Unlike the analysis provider this does not switch on the mere presence
+        of a key: an ``AI_API_KEY`` set for requirement analysis should not
+        silently start billing per embedding, and a Groq or Anthropic key would
+        point at an endpoint with no embeddings route at all. Only the
+        embedding-specific key opts in.
+        """
+        if self.embedding_provider is not None:
+            return self.embedding_provider
+        return "openai_compatible" if self.embedding_api_key else "local_onnx"
 
 
 @lru_cache

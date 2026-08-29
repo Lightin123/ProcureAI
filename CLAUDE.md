@@ -42,20 +42,63 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1 through 5 are complete. Milestone 6 (vendor ecosystem) is in
-progress: vendor registration, onboarding, capability profiles,
-verification, the vendor portal, and project-level deterministic matching
-are implemented. Work-package-level hybrid (lexical + semantic) matching is
-the current development priority and is not yet built. Full status:
+Milestones 1 through 5 are complete. **Milestone 6 (vendor ecosystem) is
+complete**, including work-package-level hybrid matching. Full status:
 [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) and
 [docs/development-roadmap.md](docs/development-roadmap.md).
 
-Implemented: React portal + Express API + PostgreSQL + FastAPI AI service.
-Officials sign in, create projects, run AI requirement analysis, review and
-edit suggestions, answer clarifications, confirm requirements, generate and
-review AI work packages, and confirm them. Vendors self-register, complete
-a progressive onboarding, get verified by an administrator, and discover
-published opportunities matched against their profile.
+Implemented: React portal + Express API + PostgreSQL with pgvector + FastAPI
+AI service. Officials sign in, create projects, run AI requirement analysis,
+review and edit suggestions, answer clarifications, confirm requirements,
+generate and review AI work packages, and confirm them. Vendors self-register,
+complete a progressive onboarding, get verified by an administrator, and
+discover published opportunities matched against their profile. For a
+**confirmed work package**, an official runs supplier matching and receives a
+ranked, explainable list of eligible suppliers, can inspect who was excluded
+and on what ground, compare suppliers side by side, and shortlist them.
+
+**Work-package vendor matching (`apps/api/src/matching/`).** Five stages, in
+separate modules, which must not be merged (D63):
+
+    confirmed work package
+      -> normalization        (normalization.ts)
+      -> hybrid retrieval     (retrieval.ts)    — lexical + semantic, unioned
+      -> candidate pool                         — deduplicated
+      -> eligibility gate     (eligibility.ts)  — hard filter, never a score
+      -> multi-factor ranking (ranking.ts)      — eligible only, 7 dimensions
+      -> explanations                           — from stored data only
+
+The gate sits between retrieval and ranking. It is applied to the candidate
+pool rather than to the whole registry because it needs each supplier's full
+record, and loading that for every supplier in order to discard most of them
+is the scan retrieval exists to avoid. What must never change is that nothing
+failing the gate reaches the ranking.
+
+Rules when touching this area:
+
+- Eligibility is a gate, not a weight. A supplier failing a mandatory
+  requirement is excluded, never merely ranked lower.
+- An absent constraint is not a satisfied one. Never emit a passed check for
+  a dimension the work package does not actually constrain.
+- Ranking is arithmetic over stored fields. No LLM decides a score or a rank.
+- Every explanation line must quote a value read from the database. Never
+  assert a capability, credential, engagement or location a supplier has not
+  recorded.
+- Semantic retrieval is additive. It is never the sole mechanism, and never a
+  filter applied on top of the lexical half.
+- Embeddings regenerate on a source digest at match time, not on profile write
+  (D67), and also when the embedding model changes. pgvector is optional;
+  without it the system degrades to lexical-only retrieval (D64).
+- What gets embedded is the **semantic document**, not the full capability
+  document (D71): capability prose only, no addresses or registration numbers
+  on the vendor side, no compliance/budget/timeline clauses on the package
+  side. Those are structured data the gate and the ranking read directly.
+- The default model is `BAAI/bge-small-en-v1.5`, a real sentence encoder run
+  locally on CPU (D70), at **384 dimensions**. The deterministic concept model
+  in `apps/ai-service/app/embeddings/concepts.py` is the offline fallback only.
+- Similarity thresholds are **per model** (`src/matching/calibration.ts`, D72).
+  Cosine is not comparable across models — never hardcode a threshold in
+  retrieval or ranking; add a calibrated row instead.
 
 **Authentication and RBAC are implemented (Milestone 5).** When touching the
 API, the rules are:
@@ -77,10 +120,10 @@ See [docs/engineering/security.md](docs/engineering/security.md) and
 [docs/product/users-and-roles.md](docs/product/users-and-roles.md).
 
 **Do not implement** until explicitly requested:
-- Work-package-level vendor matching, eligibility filtering, pgvector,
-  embeddings, hybrid semantic retrieval — Milestone 6, current priority.
-  See [docs/ai/vendor-discovery.md](docs/ai/vendor-discovery.md).
-- Vendor shortlisting and invitation — Milestone 7
+- Vendor invitation and the engagement workflow around the shortlist —
+  Milestone 7. The shortlist itself exists only as a minimal seam (D69):
+  a table, add/remove endpoints, and a list in the matching page. Do not
+  build invitation, response tracking or evaluation on top of it.
 - RFI/proposal collection, document intelligence, response evaluation —
   Milestones 8–9
 - Vendor gap analysis, procurement analytics — Milestone 10

@@ -2,7 +2,8 @@
 
 **Status:** Planned conventions + current actual status. Health,
 authentication, project, and requirement-analysis endpoints are implemented as
-of Milestone 5; every other endpoint group below is still planned.
+of Milestone 5, and work-package vendor matching and shortlisting as of
+Milestone 6, part 2; every other endpoint group below is still planned.
 
 ## Current Status
 
@@ -88,6 +89,49 @@ organization-scoped):
 - `POST /api/v1/projects/:id/requirements/reopen` — returns a confirmed
   project to `REQUIREMENTS_ANALYSIS` (D34).
 
+Work-package vendor matching endpoints (Milestone 6, part 2; all nested
+under a work package, all organization-scoped). The router is mounted at
+`/api/v1/work-packages/:workPackageId/vendor-matches` **above** the direct
+work-packages router, so the more specific path wins. All five resolve the
+work package through SQL joined on
+`procurement_projects.organization_id`, taking the organization from the
+session:
+
+- `GET /api/v1/work-packages/:workPackageId/vendor-matches` — returns the
+  **last stored run without recomputing anything**. Revisiting a package is a
+  read: no retrieval, no embedding work, no new run row. Responds
+  `{ data: { workPackage, run, recommendations, excluded, shortlist } }`,
+  with `run: null` and empty arrays when the package has never been matched.
+- `POST /api/v1/work-packages/:workPackageId/vendor-matches` — runs the
+  pipeline ("Find Suitable Vendors", and the same route recalculates when
+  supplier or requirement data has moved on). Same response shape plus
+  `matchingRequirements: { mandatoryCertifications, requiredRegions,
+  estimatedValueCeilingInr, capabilityTerms }`, so an official can see which
+  constraints the run gated on. Returns 409 `WORK_PACKAGE_NOT_CONFIRMED` when
+  the package is not `CONFIRMED`, and 409 `WORK_PACKAGE_DELETED` when it has
+  been soft-deleted. `excluded` carries suppliers the eligibility gate ruled
+  out, with their ground for exclusion, rather than dropping them (D68).
+- `GET /api/v1/work-packages/:workPackageId/vendor-matches/:vendorProfileId`
+  — one supplier in the context of this package:
+  `{ data: { vendor, offerings, experience, credentials, capacity,
+  assessment } }`, where `assessment` is that supplier's row from the last
+  stored run, or `null`. It deliberately **excludes contact details and the
+  supplier's private onboarding answers** — an official deciding needs the
+  evidence bearing on this package, not the whole profile.
+- `POST /api/v1/work-packages/:workPackageId/vendor-matches/shortlist` —
+  body `{ vendorProfileId, reason }`. The rank and score recorded against the
+  entry are read server-side from the stored run and are never accepted from
+  the body, so a shortlist record cannot assert a score the system did not
+  produce (D69). Returns 409 `WORK_PACKAGE_NOT_CONFIRMED` if the package is
+  not `CONFIRMED`, and `{ data: { created, shortlist } }` on success.
+- `DELETE /api/v1/work-packages/:workPackageId/vendor-matches/shortlist/:vendorProfileId`
+  — returns `{ data: { removed: true, shortlist } }`, or 404 if the supplier
+  is not on this shortlist.
+
+There is no vendor-facing route in this group, and neither permission below
+is held by the `VENDOR` role: a supplier cannot see the ranking they appear
+in or who they were ranked against.
+
 **Every `/api/v1` endpoint requires an authenticated session.**
 `requireAuth` is mounted on the `/api/v1` prefix rather than per route (D52),
 so protection is structural: a route added by a later milestone is
@@ -116,10 +160,24 @@ Permissions required by the implemented endpoints:
 | `POST .../requirements/confirm` | `workflow:transition` |
 | `POST .../requirements/reopen` | `workflow:transition` |
 | `GET /api/v1/system/status` | `system:status:read` |
+| `GET .../vendor-matches` | `vendor:matching:read` |
+| `POST .../vendor-matches` | `vendor:matching:read` |
+| `GET .../vendor-matches/:vendorProfileId` | `vendor:matching:read` |
+| `POST .../vendor-matches/shortlist` | `vendor:shortlist:manage` |
+| `DELETE .../vendor-matches/shortlist/:vendorProfileId` | `vendor:shortlist:manage` |
+
+`vendor:matching:read` is held by Government Officials and Administrators;
+`vendor:shortlist:manage` by Government Officials **only** — shortlisting is
+a procurement act and Administrators are oversight-only (D48/D60). Vendors
+hold neither.
 
 Organization scoping is unchanged and remains authoritative: the organization
-comes from the session, never from the request, and a project belonging to
-another organization returns **404**, not 403.
+comes from the session, never from the request, and a project — or a work
+package reached through one — belonging to another organization returns
+**404**, not 403. For the matching routes this is structural rather than
+per-handler: every one of them resolves the work package through the
+organization-scoped lookup before doing anything else, so cross-organization
+access fails by omission rather than by each handler remembering to check.
 
 ## Conventions (Planned)
 
@@ -143,7 +201,8 @@ above already follow them; the remainder are planned.
   Codes in use: `VALIDATION_ERROR`, `NOT_FOUND`, `DATABASE_NOT_CONFIGURED`,
   `INTERNAL_ERROR`, `AI_SERVICE_UNAVAILABLE`, `AI_SERVICE_ERROR`,
   `AI_OUTPUT_INVALID`, `INVALID_STATE_TRANSITION`,
-  `NO_ACCEPTED_REQUIREMENTS`, and the authentication codes below.
+  `NO_ACCEPTED_REQUIREMENTS`, `WORK_PACKAGE_NOT_CONFIRMED` (409),
+  `WORK_PACKAGE_DELETED` (409), and the authentication codes below.
   (`SEED_DATA_MISSING` was removed in Milestone 5 along with the seeded
   identity resolver.)
 
@@ -172,7 +231,8 @@ methods, and payloads are not yet designed.
 - `Requirements` — structured requirement CRUD, approval actions.
 - `Clarifications` — clarification question/answer endpoints.
 - `Work Packages` — work package CRUD.
-- `Vendors` — vendor discovery, vendor profile access.
+- `Vendors` — vendor discovery and vendor profile access are **implemented**
+  for work-package matching (above); vendor invitation is not.
 - `Submissions` — RFI/proposal submission endpoints.
 - `Evaluations` — evaluation and ranking retrieval.
 - `Audit` — audit log retrieval (admin-scoped).

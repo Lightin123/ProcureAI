@@ -25,6 +25,10 @@ export const PERMISSIONS = [
   "response:configure",
   "response:read",
   "response:manage",
+  "evaluation:configure",
+  "evaluation:read",
+  "evaluation:manage",
+  "evaluation:decide",
   "organization:read",
   "system:status:read",
   "user:read",
@@ -75,6 +79,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "response:configure",
     "response:read",
     "response:manage",
+    // Milestone 9. Configuring evaluation criteria, running an evaluation,
+    // asking for an advisory reading and — above all — recording the
+    // procurement decision are the acts the accountable official is
+    // accountable for. None of the four is held by any other role.
+    "evaluation:configure",
+    "evaluation:read",
+    "evaluation:manage",
+    "evaluation:decide",
     "organization:read",
     "system:status:read",
     "opportunity:publish",
@@ -90,6 +102,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     // Oversight reads a collected response as it reads a ranking, and acts on
     // neither: `response:configure` and `response:manage` are withheld.
     "response:read",
+    // Oversight may read an evaluation, its scores and the decision that was
+    // recorded — that is what oversight is for. It may not configure the
+    // criteria, run an evaluation, generate an advisory reading, or decide.
+    "evaluation:read",
     "organization:read",
     "system:status:read",
     "user:read",

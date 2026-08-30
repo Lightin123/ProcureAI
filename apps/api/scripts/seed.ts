@@ -4,16 +4,15 @@ import { hashPassword } from "../src/auth/password.js";
 import { loadConfig } from "../src/config/env.js";
 import { SEEDED_ORGANIZATIONS, SEEDED_USERS } from "../src/config/seedIdentity.js";
 import { SEEDED_OPPORTUNITIES } from "../src/config/seedOpportunities.js";
-import { SEEDED_VENDORS } from "../src/config/seedVendors.js";
+import { VENDOR_CATALOGUE } from "../src/config/vendors/index.js";
 import { SEEDED_DECOMPOSED_PROJECTS } from "../src/config/seedWorkPackages.js";
 import { closePool, query } from "../src/db/pool.js";
-import { createProfile, updateProfileValues } from "../src/repositories/vendorProfiles.js";
 import {
-  createCredential,
-  createExperience,
-  createOffering,
-} from "../src/repositories/vendorPortfolio.js";
-import { refreshDerivedState } from "../src/vendor/profileService.js";
+  resolveAdministratorId,
+  seedCatalogueVendor,
+  upsertOrganization,
+  upsertUser,
+} from "./vendorSeeding.js";
 
 const MINIMUM_PASSWORD_LENGTH = 12;
 
@@ -45,56 +44,6 @@ function resolvePassword(): { password: string; generated: boolean } {
   }
 
   return { password: configured, generated: false };
-}
-
-async function upsertOrganization(input: {
-  code: string;
-  name: string;
-  kind: string;
-}): Promise<string> {
-  const result = await query<{ id: string }>(
-    `INSERT INTO organizations (code, name, kind)
-     VALUES ($1, $2, $3::organization_kind)
-     ON CONFLICT (code) DO UPDATE
-       SET name = EXCLUDED.name, kind = EXCLUDED.kind
-     RETURNING id`,
-    [input.code, input.name, input.kind],
-  );
-
-  const id = result.rows[0]?.id;
-  if (id === undefined) throw new Error(`Failed to seed organization ${input.code}.`);
-  return id;
-}
-
-/**
- * `ON CONFLICT (email) DO UPDATE` keeps the existing row and its UUID, so an
- * account is promoted in place and every foreign key that already points at it
- * stays valid (D50).
- */
-async function upsertUser(input: {
-  email: string;
-  fullName: string;
-  role: string;
-  organizationId: string;
-  passwordHash: string;
-}): Promise<string> {
-  const result = await query<{ id: string }>(
-    `INSERT INTO users (email, full_name, role, organization_id, password_hash, is_active)
-     VALUES ($1, $2, $3::user_role, $4, $5, true)
-     ON CONFLICT (email) DO UPDATE
-       SET full_name       = EXCLUDED.full_name,
-           role            = EXCLUDED.role,
-           organization_id = EXCLUDED.organization_id,
-           password_hash   = EXCLUDED.password_hash,
-           is_active       = true,
-           updated_at      = now()
-     RETURNING id`,
-    [input.email, input.fullName, input.role, input.organizationId, input.passwordHash],
-  );
-
-  const id = result.rows[0]?.id;
-  if (id === undefined) throw new Error(`Failed to seed user ${input.email}.`);
-  return id;
 }
 
 function dateInDays(days: number): string {
@@ -132,72 +81,28 @@ async function seedIdentities(passwordHash: string): Promise<Map<string, string>
   return organizationIds;
 }
 
-async function seedVendors(passwordHash: string): Promise<void> {
-  for (const vendor of SEEDED_VENDORS) {
-    const organizationId = await upsertOrganization({
-      code: vendor.organizationCode,
-      name: vendor.organizationName,
-      kind: "VENDOR",
-    });
+/**
+ * Writes every demonstration supplier through the shared catalogue routine.
+ *
+ * The original eight and the fifty added for the expanded registry go through
+ * the same code, so no supplier is onboarded, documented or verified
+ * differently from any other. Each one is validated against the API's own patch
+ * schema before it is written and checked for 100% completion afterwards, so a
+ * catalogue entry that would produce a half-finished profile fails the seed
+ * rather than landing in the registry.
+ */
+async function seedVendorCatalogue(passwordHash: string): Promise<void> {
+  const administratorId = await resolveAdministratorId();
 
-    const userId = await upsertUser({
-      email: vendor.email,
-      fullName: vendor.fullName,
-      role: "VENDOR",
-      organizationId,
-      passwordHash,
-    });
-
-    const profile = await createProfile({
-      organizationId,
-      createdBy: userId,
-      legalName: vendor.organizationName,
-      primaryContact: {},
-    });
-
-    await updateProfileValues(profile.id, vendor.profile);
-
-    // Collections are replaced wholesale so a re-run does not accumulate
-    // duplicates of the same demonstration entries.
-    await query(`DELETE FROM vendor_offerings WHERE vendor_profile_id = $1`, [profile.id]);
-    await query(`DELETE FROM vendor_experience WHERE vendor_profile_id = $1`, [profile.id]);
-    await query(`DELETE FROM vendor_credentials WHERE vendor_profile_id = $1`, [profile.id]);
-
-    for (const offering of vendor.offerings) {
-      await createOffering(profile.id, { ...offering, description: offering.description });
-    }
-
-    for (const entry of vendor.experience) {
-      await createExperience(profile.id, { ...entry, referenceUrl: null });
-    }
-
-    for (const credential of vendor.credentials) {
-      await createCredential(profile.id, {
-        ...credential,
-        identifier: null,
-        issuedOn: null,
-        validUntil: null,
-        notes: null,
-      });
-    }
-
-    // Runs the same derivation the API runs after any profile write, so the
-    // completion percentage and capability document a seeded supplier carries
-    // are computed exactly as a real one's would be.
-    const full = await refreshDerivedState(profile.id);
-
-    await query(
-      `UPDATE vendor_profiles
-       SET status             = $2::vendor_profile_status,
-           verification_state = $3::vendor_verification_state,
-           submitted_at       = CASE WHEN $2 = 'DRAFT' THEN NULL ELSE COALESCE(submitted_at, now()) END,
-           verified_at        = CASE WHEN $3 = 'VERIFIED' THEN COALESCE(verified_at, now()) ELSE NULL END
-       WHERE id = $1`,
-      [profile.id, vendor.status, vendor.verificationState],
-    );
+  for (const vendor of VENDOR_CATALOGUE) {
+    const outcome = await seedCatalogueVendor(vendor, { passwordHash, administratorId });
 
     console.log(
-      `supplier      ${vendor.email.padEnd(38)} ${String(full.completion.percentage).padStart(3)}% ${vendor.verificationState}`,
+      `supplier      ${vendor.email.padEnd(44)} ` +
+        `${String(outcome.completionPercentage).padStart(3)}% VERIFIED  ` +
+        `off ${outcome.offerings} exp ${outcome.experience} ` +
+        `cred ${outcome.credentials} doc ${outcome.documents} ` +
+        `kw ${String(outcome.keywords).padStart(3)}`,
     );
   }
 }
@@ -438,7 +343,7 @@ async function run(): Promise<void> {
   const organizationIds = await seedIdentities(passwordHash);
   console.log("");
 
-  await seedVendors(passwordHash);
+  await seedVendorCatalogue(passwordHash);
   console.log("");
 
   await seedOpportunities(organizationIds);
@@ -448,9 +353,9 @@ async function run(): Promise<void> {
   console.log("");
 
   console.log(
-    `Seeded ${SEEDED_ORGANIZATIONS.length + SEEDED_VENDORS.length} organizations, ` +
-      `${SEEDED_USERS.length + SEEDED_VENDORS.length} users, ` +
-      `${SEEDED_VENDORS.length} supplier profiles and ` +
+    `Seeded ${SEEDED_ORGANIZATIONS.length + VENDOR_CATALOGUE.length} organizations, ` +
+      `${SEEDED_USERS.length + VENDOR_CATALOGUE.length} users, ` +
+      `${VENDOR_CATALOGUE.length} verified supplier profiles and ` +
       `${SEEDED_OPPORTUNITIES.length} procurement projects.`,
   );
   console.log("All demo accounts share one password; re-run this script to reset it.");

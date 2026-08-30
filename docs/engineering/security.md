@@ -176,6 +176,49 @@ endpoint behind it enforces the same permission — the System Status page is
 the worked example: gating the page alone would have left its data readable by
 anyone (D54).
 
+### The evaluation side has no supplier half at all (Milestone 9)
+
+Where an invitation and a response each have two sides that must not see each
+other's view, an **evaluation has only one**. Scores, criteria, rankings,
+comparisons, advisory readings and the department's decision reasoning are
+government-side artefacts about a supplier, and no version of them is served to
+that supplier or to any other.
+
+1. **Four permissions, none held by a vendor role** (D91).
+   `evaluation:configure`, `evaluation:manage` and `evaluation:decide` are
+   `GOVERNMENT_OFFICIAL` only; `evaluation:read` is held by
+   `GOVERNMENT_OFFICIAL` and `ADMIN`. A supplier holds none, so every route
+   under `/api/v1/work-packages/:id/evaluation` answers a supplier with 403 —
+   including the routes about that supplier's own response.
+
+2. **One router, no role flag.** There is no vendor-facing evaluation router,
+   no vendor-facing evaluation repository function, and no branch in an
+   existing handler that would serve a narrower shape to a supplier. The
+   supplier's own response view (`routes/vendorResponses.ts`) selects no
+   evaluation column, and an integration test asserts that its payload contains
+   no `totalScore`, `rankPosition`, `criterionScores` or decision field.
+
+3. **Organization applied in SQL, ids never trusted.** Every route resolves the
+   work package through the session's organization before anything else; a run
+   id, response id, decision id or question id arriving from the browser is
+   checked against **this** work package and **this** department before it is
+   read or stored. A criterion may not be bound to a departmental question on
+   another package's response form, and a decision may not cite an evaluation
+   run from another package.
+
+4. **A draft stays unreadable.** The Milestone 8 rule that a department cannot
+   read an unsubmitted draft (D83) is not relaxed for evaluation: the
+   per-response evaluation route returns 409 `RESPONSE_NOT_SUBMITTED`, and the
+   scoring pipeline excludes drafts in SQL rather than filtering them
+   afterwards.
+
+5. **The decision has exactly one writer.** `work_package_response_decisions`
+   is written only by the route an official invokes with `evaluation:decide`, a
+   named response, an outcome and a typed reason. No evaluation, ranking or AI
+   call writes it, and an integration test asserts that running an evaluation
+   adds no row. Two partial unique indexes hold the rest: one live decision per
+   response, one live selection per work package.
+
 ### Organization scope
 
 `request.user.organizationId` is derived from the session's user row. No
@@ -265,6 +308,18 @@ account, so the department never appears in the record as the author of an
 answer it did not give. The invitation row itself independently carries
 `invited_by`, `responded_by` and `withdrawn_by`.
 
+Milestone 8 and Milestone 9 extend it again into the same table.
+`EVALUATION_CONFIGURED` records the criteria before and after a change,
+`EVALUATION_RUN` records the run id, the versions applied and the ranking that
+was shown, `EVALUATION_AI_ANALYSIS` records the provider, model and prompt
+version of an advisory reading and marks it advisory, and `VENDOR_SELECTED`,
+`VENDOR_REJECTED` and `DECISION_REVOKED` record the decision with the
+official's reason in the `reason` column. Together with the evaluation runs —
+which are never overwritten and each carry the criteria they applied — a later
+reviewer can reconstruct which criteria were configured, which responses were
+evaluated, what scores were calculated, what AI analysis was generated and on
+what evidence, what ranking was shown, what was decided, by whom and when.
+
 A general audit log (FR11) still does not exist; whether authentication events
 warrant their own table is U31.
 
@@ -273,9 +328,18 @@ warrant their own table is U31.
 Unchanged from Milestone 3:
 
 - **Prompt injection.** A project's problem description is official-supplied
-  text placed into an LLM prompt. The system prompt instructs the model to
-  treat it strictly as data, and the required output schema constrains what
-  can be returned — enforced by structured outputs on Anthropic and by JSON
+  text placed into an LLM prompt, and from Milestone 9 a **supplier-supplied**
+  response is too — which is a materially different exposure, because the
+  author of that text has an interest in how it is assessed. The system prompt
+  instructs the model to treat it strictly as data, to ignore any instruction
+  that appears inside it, and to record any attempt to influence the assessment
+  as a point for human attention rather than acting on it. The decisive control
+  is structural rather than textual: the reading is advisory, the response
+  schema has no score or recommendation field, and nothing in the scoring
+  pipeline reads what the model returned (D89). A successful injection can
+  therefore mislead a reader of one advisory paragraph; it cannot move a score,
+  a rank or a decision. The required output schema constrains what can be
+  returned — enforced by structured outputs on Anthropic and by JSON
   mode plus validation and a bounded retry on OpenAI-compatible providers
   (D40). The decisive control remains that nothing AI-generated enters
   confirmed state without human approval.

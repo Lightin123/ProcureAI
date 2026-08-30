@@ -30,11 +30,20 @@ the dependency count where D20 and D6 left it.
 
 - `npm test` — unit suites (`tests/*.unit.test.ts`). Pure functions only, no
   database and no HTTP: the matching pipeline's normalization, eligibility and
-  ranking stages, and Milestone 8's response catalogue, answer validators and
-  completeness computation. These are the parts that must be right before any
-  request reaches them — the completeness rule in particular is read by both
-  the supplier's progress indicator and the submission gate (D80), so an error
-  here would be an error in both at once.
+  ranking stages; Milestone 8's response catalogue, answer validators and
+  completeness computation; and Milestone 9's criterion catalogue, consistency
+  rules, compliance derivation, threshold extraction, scoring formulas,
+  weighting and ranking. These are the parts that must be right before any
+  request reaches them — the completeness rule is read by both the supplier's
+  progress indicator and the submission gate (D80), so an error there is an
+  error in both at once, and a scoring rule that is wrong is wrong in the
+  ranking, in the comparison and in the record a procurement decision cites,
+  all at once.
+
+  The Milestone 9 unit suite asserts the two properties the evaluation is built
+  to hold and that nothing else can check: that identical input produces
+  identical output (reproducibility), and that missing information is never
+  scored as compliance.
 - `npm run test:integration` — end-to-end suites (`tests/*.integration.test.ts`)
   over HTTP against a running API and a seeded database. They verify what a
   unit test cannot: that the session decides who the caller is, that the
@@ -52,6 +61,20 @@ same seeded work packages.
 Each suite clears the state it will assert on before it runs and removes what
 it created afterwards, so it can be re-run against the same seed without a
 reseed.
+
+Two checks sit outside the test runner because what they verify is data rather
+than behaviour:
+
+- `npm run check:vendors` runs the real onboarding-completion computation and
+  the API's own profile patch schema over the demonstration supplier catalogue
+  without a database, and fails if any supplier would land below 100%
+  completion or carries a value outside the taxonomy. It is fast enough to run
+  on every edit to the catalogue, which is the point: a gap is found in a
+  second rather than halfway through a seed run against a hosted server.
+- `npx tsx scripts/verifyVendorRegistry.ts` reads the seeded database back and
+  fails if any supplier is short of registered, complete, documented and
+  administrator-verified. It asserts on what was written rather than on what
+  was meant to be written, so a partially completed seed cannot pass unnoticed.
 
 ## Explicitly Not Yet Decided
 

@@ -34,7 +34,19 @@ export type WorkPackageHistoryAction =
   | "RESPONSE_CLARIFICATION_ASKED"
   | "RESPONSE_CLARIFICATION_ANSWERED"
   | "RESPONSE_READY_FOR_EVALUATION"
-  | "RESPONSE_WITHDRAWN";
+  | "RESPONSE_WITHDRAWN"
+  // Milestone 9. Configuring criteria, running an evaluation, generating an
+  // advisory reading and recording a decision are all things that happened to
+  // this work package, so they are audited where everything else about it is
+  // (D73). `VENDOR_SELECTED` is the only action in this system that records a
+  // supplier being chosen, and only a route a named official invoked with a
+  // reason writes it.
+  | "EVALUATION_CONFIGURED"
+  | "EVALUATION_RUN"
+  | "EVALUATION_AI_ANALYSIS"
+  | "VENDOR_SELECTED"
+  | "VENDOR_REJECTED"
+  | "DECISION_REVOKED";
 
 export interface WorkPackageHistoryEntry {
   id: string;

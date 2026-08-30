@@ -295,3 +295,118 @@ export async function requestCapabilityInsights(
 
   return parsed.data;
 }
+
+// ---------------------------------------------------------------------------
+// Response evaluation insights (Milestone 9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deliberately has no score, rank, weight or recommendation field.
+ *
+ * The deterministic evaluation is computed in `src/evaluation/` from the
+ * supplier's own stated figures, and it never reads anything the AI service
+ * returns. A model that tried to move a score would have nowhere to put the
+ * number: this schema rejects unknown keys by simply not carrying them
+ * forward, and the storage table has no column for one either.
+ */
+const evaluationInsightSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  detail: z.string().trim().min(1).max(1500),
+});
+
+const evaluationEvidenceSchema = z.object({
+  section: z.string().trim().min(1).max(200),
+  quote: z.string().trim().min(1).max(400),
+});
+
+const responseInsightsSchema = z.object({
+  summary: z.string().trim().min(1).max(4000),
+  technical_fit: z.string().max(4000).default(""),
+  experience_relevance: z.string().max(4000).default(""),
+  strengths: z.array(evaluationInsightSchema).default([]),
+  weaknesses: z.array(evaluationInsightSchema).default([]),
+  attention_points: z.array(evaluationInsightSchema).default([]),
+  evidence: z.array(evaluationEvidenceSchema).default([]),
+  model: z.string().min(1),
+  provider: z.string().min(1),
+  prompt_version: z.string().min(1),
+  response_time_ms: z.number().default(0),
+});
+
+export type ResponseInsightsResult = z.infer<typeof responseInsightsSchema>;
+
+export interface ResponseInsightsInput {
+  packageNumber: string;
+  packageTitle: string;
+  packageScope: string;
+  requirements: Array<{ category: string; text: string }>;
+  responseType: string;
+  supplierName: string;
+  sections: Array<{ label: string; content: string }>;
+  requirementAnswers: Array<{ requirement: string; position: string; answer: string | null }>;
+  questionAnswers: Array<{ prompt: string; answer: string }>;
+  documentTitles: string[];
+}
+
+/**
+ * Asks the AI service to read one submitted response and describe it.
+ *
+ * Advisory, and structurally so: the result is stored in its own append-only
+ * table, rendered under an advisory label, and read by nothing in the scoring
+ * path. Like every other AI call in this platform, the output is schema
+ * validated before it is stored (D9).
+ */
+export async function requestResponseInsights(
+  input: ResponseInsightsInput,
+): Promise<ResponseInsightsResult> {
+  const config = loadConfig();
+
+  let response: Response;
+  try {
+    response = await fetch(`${config.aiServiceUrl}/internal/v1/response-evaluation-insights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        package_number: input.packageNumber,
+        package_title: input.packageTitle,
+        package_scope: input.packageScope,
+        requirements: input.requirements,
+        response_type: input.responseType,
+        supplier_name: input.supplierName,
+        sections: input.sections,
+        requirement_answers: input.requirementAnswers,
+        question_answers: input.questionAnswers,
+        document_titles: input.documentTitles,
+      }),
+      signal: AbortSignal.timeout(config.aiServiceTimeoutMs),
+    });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    throw new ApiError(
+      503,
+      "AI_SERVICE_UNAVAILABLE",
+      timedOut
+        ? "The AI service did not respond within the allowed time."
+        : "The AI service could not be reached.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      502,
+      "AI_SERVICE_ERROR",
+      `The AI service returned an error (HTTP ${response.status}).`,
+    );
+  }
+
+  const parsed = responseInsightsSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "AI_OUTPUT_INVALID",
+      "The AI service returned an analysis that failed validation.",
+    );
+  }
+
+  return parsed.data;
+}

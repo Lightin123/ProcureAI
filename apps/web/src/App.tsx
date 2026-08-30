@@ -7,6 +7,7 @@ import { RequireAuth } from "./components/RequireAuth.js";
 import { RequirePermission } from "./components/RequirePermission.js";
 import { AdminSupplierDetailPage } from "./pages/AdminSupplierDetailPage.js";
 import { AdminSupplierRegistryPage } from "./pages/AdminSupplierRegistryPage.js";
+import { EvaluationResponseDetailPage } from "./pages/EvaluationResponseDetailPage.js";
 import { ForbiddenPage } from "./pages/ForbiddenPage.js";
 import { GovernmentResponseDetailPage } from "./pages/GovernmentResponseDetailPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
@@ -27,6 +28,7 @@ import { VendorProfilePage } from "./pages/VendorProfilePage.js";
 import { VendorRegisterPage } from "./pages/VendorRegisterPage.js";
 import { VendorResponseEditorPage } from "./pages/VendorResponseEditorPage.js";
 import { VendorResponsesPage } from "./pages/VendorResponsesPage.js";
+import { WorkPackageEvaluationPage } from "./pages/WorkPackageEvaluationPage.js";
 import { WorkPackageResponsesPage } from "./pages/WorkPackageResponsesPage.js";
 import { WorkPackageVendorMatchingPage } from "./pages/WorkPackageVendorMatchingPage.js";
 
@@ -71,6 +73,14 @@ export function App() {
             <Route
               path="projects/:id/work-packages/:workPackageId/responses/:responseId"
               element={<GovernmentResponseDetailPage />}
+            />
+            <Route
+              path="projects/:id/work-packages/:workPackageId/evaluation"
+              element={<WorkPackageEvaluationPage />}
+            />
+            <Route
+              path="projects/:id/work-packages/:workPackageId/evaluation/responses/:responseId"
+              element={<EvaluationResponseDetailPage />}
             />
           </Route>
 

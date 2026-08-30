@@ -16,6 +16,11 @@ from app.prompts.work_package_decomposition import (
     SYSTEM_PROMPT as WP_SYSTEM_PROMPT,
     build_work_package_prompt,
 )
+from app.prompts.response_evaluation import (
+    PROMPT_VERSION as RESPONSE_PROMPT_VERSION,
+    SYSTEM_PROMPT as RESPONSE_SYSTEM_PROMPT,
+    build_user_prompt as build_response_prompt,
+)
 from app.prompts.vendor_capability import (
     PROMPT_VERSION as CAPABILITY_PROMPT_VERSION,
     SYSTEM_PROMPT as CAPABILITY_SYSTEM_PROMPT,
@@ -26,6 +31,10 @@ from app.schemas import (
     CapabilityInsight,
     CapabilityInsightsRequest,
     CapabilityInsightsResponse,
+    EvaluationEvidence,
+    EvaluationInsight,
+    ResponseEvaluationRequest,
+    ResponseEvaluationResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     SuggestedClarification,
@@ -56,6 +65,23 @@ class CapabilityPayload(BaseModel):
     strengths: list[CapabilityInsight]
     gaps: list[CapabilityInsight]
     suggested_opportunity_areas: list[str]
+
+
+class ResponseInsightPayload(BaseModel):
+    """Schema the model is constrained to produce for a response reading.
+
+    There is deliberately no score, rank, weight or recommendation field. The
+    model cannot return one because the shape it is constrained to has nowhere
+    to put it.
+    """
+
+    summary: str
+    technical_fit: str = ""
+    experience_relevance: str = ""
+    strengths: list[EvaluationInsight] = []
+    weaknesses: list[EvaluationInsight] = []
+    attention_points: list[EvaluationInsight] = []
+    evidence: list[EvaluationEvidence] = []
 
 
 class AnthropicProvider:
@@ -235,4 +261,63 @@ class AnthropicProvider:
             suggested_opportunity_areas=validated.suggested_opportunity_areas,
             model=self._settings.anthropic_model,
             prompt_version=CAPABILITY_PROMPT_VERSION,
+        )
+
+    async def response_insights(
+        self, request: ResponseEvaluationRequest
+    ) -> ResponseEvaluationResponse:
+        start_time = time.time()
+
+        user_prompt = build_response_prompt(
+            package_number=request.package_number,
+            package_title=request.package_title,
+            package_scope=request.package_scope,
+            requirements=[item.model_dump() for item in request.requirements],
+            response_type=request.response_type,
+            supplier_name=request.supplier_name,
+            sections=[item.model_dump() for item in request.sections],
+            requirement_answers=[item.model_dump() for item in request.requirement_answers],
+            question_answers=[item.model_dump() for item in request.question_answers],
+            document_titles=request.document_titles,
+        )
+
+        try:
+            response = await self._client.beta.messages.parse(
+                model=self._settings.anthropic_model,
+                max_tokens=self._settings.anthropic_max_tokens,
+                system=RESPONSE_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+                output_format=ResponseInsightPayload,
+            )
+        except anthropic.APIStatusError as error:
+            raise ProviderError(
+                f"Anthropic API returned {error.status_code} ({error.type})."
+            ) from error
+        except anthropic.APIConnectionError as error:
+            raise ProviderError("Could not reach the Anthropic API.") from error
+
+        if response.stop_reason == "refusal":
+            raise ProviderError("The model declined to read this response.")
+
+        payload = response.parsed_output
+        if payload is None:
+            raise ProviderError("The model did not return a parseable reading.")
+
+        try:
+            validated = ResponseInsightPayload.model_validate(payload)
+        except ValidationError as error:
+            raise ProviderError(f"Model output failed validation: {error}") from error
+
+        return ResponseEvaluationResponse(
+            summary=validated.summary,
+            technical_fit=validated.technical_fit,
+            experience_relevance=validated.experience_relevance,
+            strengths=validated.strengths,
+            weaknesses=validated.weaknesses,
+            attention_points=validated.attention_points,
+            evidence=validated.evidence,
+            model=self._settings.anthropic_model,
+            provider=self.name,
+            prompt_version=RESPONSE_PROMPT_VERSION,
+            response_time_ms=int((time.time() - start_time) * 1000),
         )

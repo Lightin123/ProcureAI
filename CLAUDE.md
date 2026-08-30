@@ -42,9 +42,9 @@ Full detail: [docs/architecture/architecture.md](docs/architecture/architecture.
 
 ## Current Development Stage
 
-Milestones 1 through 7 are complete, including work-package-level hybrid
-matching and vendor engagement. **Milestone 8 (vendor response and proposal
-collection) is complete.**
+Milestones 1 through 8 are complete, including work-package-level hybrid
+matching, vendor engagement and structured response collection. **Milestone 9
+(evaluation and AI-assisted decision support) is complete.**
 Full status: [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md)
 and [docs/development-roadmap.md](docs/development-roadmap.md).
 
@@ -64,7 +64,12 @@ suppliers that accepted, and tracks what comes back; the supplier drafts that
 response over several sittings, answers each confirmed requirement, attaches
 documents, reviews and submits it. Either side can raise a clarification, and
 the official moves a submitted response through review to
-`READY_FOR_EVALUATION`, where Milestone 9 begins.
+`READY_FOR_EVALUATION`. From there the official configures weighted evaluation
+criteria, runs a deterministic evaluation over the ready responses, reads an
+explainable ranking with the basis and evidence behind every score, compares
+suppliers side by side and requirement by requirement, optionally asks for an
+advisory AI reading of each response, and records a selection or a rejection
+with a mandatory reason — the only act in the system that chooses a supplier.
 
 **Work-package vendor matching (`apps/api/src/matching/`).** Five stages, in
 separate modules, which must not be merged (D63):
@@ -190,6 +195,56 @@ Rules when touching this area:
 - Nothing in this milestone scores, ranks or recommends a response.
   `READY_FOR_EVALUATION` is where Milestone 8 stops.
 
+**Evaluation and decision (`apps/api/src/evaluation/`, Milestone 9).** The
+`READY_FOR_EVALUATION` response from Milestone 8 is the seam the evaluation is
+built on, and it was not changed:
+
+    responses in READY_FOR_EVALUATION
+      -> criteria            (criteria.ts)   — configured, weights sum to 100
+      -> thresholds          (signals.ts)    — configured, else from requirements
+      -> compliance          (compliance.ts) — one verdict per requirement
+      -> scoring             (scoring.ts)    — deterministic, reproducible
+      -> ranking             (ranking.ts)    — ordering plus its reasons
+      -> run + snapshot                      — never overwritten
+      -> human decision                      — reason mandatory
+
+Rules when touching this area:
+
+- The order **AI analysis -> deterministic evaluation -> ranked
+  recommendations -> human decision** is the whole trust model. Nothing in
+  `src/evaluation/` may import the AI client or read
+  `work_package_response_ai_analyses`; nothing may write
+  `work_package_response_decisions` except the route an official invokes.
+- A score is arithmetic over stored values. No LLM produces, adjusts or
+  influences a score, a rank or an ordering. The AI request and response
+  schemas carry no score, rank, weight or recommendation field, and the
+  analyses table has no score column (D89) — do not add one.
+- **Missing information is never compliance** (D88). A stated `MEETS` with no
+  substantiating text is `INSUFFICIENT_INFORMATION`, and the supplier's own
+  stated position stays visible beside the derived verdict. An absence never
+  produces `NON_COMPLIANT`.
+- A criterion may only be scored from a response section the department
+  actually asked for. `validateCriteria` enforces it on save and again before
+  every run; do not add a handler-level check instead.
+- Every criterion score carries the sentence explaining how it was reached and
+  the evidence lines it was read from, quoted from stored values. Never assert
+  a figure, credential or engagement a supplier did not record.
+- Scoring must stay reproducible: nothing reads the clock or a random source,
+  and the relative criteria are computed over the set of responses stored with
+  the run.
+- **Runs accumulate; they are never overwritten** (D87). Each carries its own
+  `criteria_snapshot`, so changing the criteria cannot alter a score a
+  decision already cites.
+- **Decisions are immutable.** A correction is a revocation with its own
+  reason plus a new decision, never an `UPDATE`. The rank and score stored
+  with a decision are read server-side from the cited run, never from the
+  request body (D90).
+- Eligibility is **read** from the Milestone 6 matching run, never re-derived
+  (D92). Do not add a second gate here.
+- Every government-facing lookup takes the organization from the session and
+  applies it in SQL. No vendor role holds any `evaluation:*` permission, and
+  there is no vendor-facing evaluation route — do not add one.
+
 **Authentication and RBAC are implemented (Milestone 5).** When touching the
 API, the rules are:
 
@@ -210,16 +265,17 @@ See [docs/engineering/security.md](docs/engineering/security.md) and
 [docs/product/users-and-roles.md](docs/product/users-and-roles.md).
 
 **Do not implement** until explicitly requested:
-- Proposal scoring, vendor ranking of responses, AI evaluation of a
-  submission, compliance scoring, automatic vendor selection, final
-  procurement decision recording, document intelligence — Milestone 9.
-  Milestone 8 stops at `READY_FOR_EVALUATION`: that state records that a
-  response is complete enough to be assessed, and is not an assessment, a
-  score, a rank or an award. Do not build an evaluation entity, a scoring
-  column or a comparison ranking on top of it.
-- Vendor gap analysis, procurement analytics — Milestone 10
+- Document intelligence — parsing or extracting structure from the *contents*
+  of an uploaded attachment. Milestone 9 reads the structured fields and the
+  written answers a supplier submitted, and passes attachment **titles** only
+  to the AI service, which is told not to assume anything about their contents.
+- Vendor gap analysis, procurement analytics, organization-wide intelligence
+  dashboards — Milestone 10
 - Advanced semantic optimization (learned ranking, query expansion,
-  reranking) — Milestone 11
+  reranking), learning from recorded human decisions, model fine-tuning, and
+  automatic allocation of vendors across several work packages — Milestone 11.
+  Milestone 9 records selections and rejections and deliberately learns
+  nothing from them.
 - Workflow transitions beyond `WORK_PACKAGES_CONFIRMED`
 - Background job infrastructure (analysis is synchronous — see D30)
 - Administrator user-management UI or password reset (U30)

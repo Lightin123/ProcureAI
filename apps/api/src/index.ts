@@ -14,6 +14,7 @@ import { vendorInvitationsRouter } from "./routes/vendorInvitations.js";
 import { vendorMatchingRouter } from "./routes/vendorMatching.js";
 import { vendorRegistryRouter } from "./routes/vendorRegistry.js";
 import { vendorResponsesRouter } from "./routes/vendorResponses.js";
+import { workPackageEvaluationRouter } from "./routes/workPackageEvaluation.js";
 import { workPackageResponsesRouter } from "./routes/workPackageResponses.js";
 import {
   directWorkPackagesRouter,
@@ -52,6 +53,7 @@ app.use("/api/v1/projects/:projectId/requirements", requirementsRouter);
 app.use("/api/v1/projects/:projectId/work-packages", projectWorkPackagesRouter);
 app.use("/api/v1/work-packages/:workPackageId/vendor-matches", vendorMatchingRouter);
 app.use("/api/v1/work-packages/:workPackageId/responses", workPackageResponsesRouter);
+app.use("/api/v1/work-packages/:workPackageId/evaluation", workPackageEvaluationRouter);
 app.use("/api/v1/work-packages", directWorkPackagesRouter);
 app.use("/api/v1/projects", projectsRouter);
 app.use("/api/v1/system", systemRouter);

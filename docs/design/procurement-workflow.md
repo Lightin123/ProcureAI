@@ -263,7 +263,7 @@ only.
 
 Also **work-package-level**, and again introducing **no new project state**.
 It begins where the engagement lifecycle ends, at an accepted invitation, and
-ends at `READY_FOR_EVALUATION`, where Milestone 9 begins.
+ends at `READY_FOR_EVALUATION`, where the evaluation lifecycle begins.
 
 ```
 ACCEPTED invitation
@@ -299,7 +299,7 @@ ACCEPTED invitation
                      mark ready
                           |
                           v
-                READY_FOR_EVALUATION            --> Milestone 9
+                READY_FOR_EVALUATION            --> evaluation lifecycle
 
    WITHDRAWN  <--- the supplier, from any state before evaluation
 ```
@@ -357,6 +357,82 @@ review, marking a response ready, and the supplier's own submission and
 withdrawal each write a notification to the supplier's list in the same
 request, in the `RESPONSE` category. The same header bell and unread count
 carry them; there is still no channel outside the portal.
+
+## Evaluation and Decision Lifecycle (Implemented, Milestone 9)
+
+Also **work-package-level**, and again introducing **no new project state** and
+no new response state: an assessment is not a property of the submission.
+It begins at `READY_FOR_EVALUATION` and ends at a recorded human decision.
+
+```
+responses in READY_FOR_EVALUATION
+        |
+        v
+  evaluation criteria                 (department: criterion types, weights
+        |                              summing to 100, optional thresholds,
+        |                              a bound departmental question)
+        |
+    DRAFT (inconsistent)  ---> READY  (consistent: runnable)
+                                 |
+                                 v
+                          run evaluation
+                                 |
+       +-------------------------+--------------------------+
+       |                         |                          |
+       v                         v                          v
+  deterministic             requirement-by-             responses not
+  criterion scores          requirement                 assessed, with
+  + weighted total          comparison                  the reason
+       |                         |
+       +-----------+-------------+
+                   v
+          explainable ranking          (order, strongest and weakest factors,
+                   |                    missing information, evidence)
+                   v
+       side-by-side comparison
+                   |
+      optional: advisory AI reading    (separate lane, no score, no rank)
+                   |
+                   v
+         HUMAN DECISION                (an official, a named response, an
+        SELECTED | REJECTED             outcome, a mandatory reason)
+                   |
+                   v
+              REVOKED                  (a correction, leaving the original
+                                        and its reason on the record)
+```
+
+### Rules
+
+- **Nothing advances automatically, and nothing selects a supplier.**
+  Configuring criteria, running an evaluation, generating an advisory reading
+  and recording a decision are each an explicit act by an identified person.
+  The decision table has exactly one writer: the route an official calls with
+  a reason they typed.
+- **The four layers are kept apart, in this order.** AI analysis identifies and
+  quotes evidence; deterministic evaluation applies the configured criteria;
+  the ranking follows from those scores; the human decides. AI never determines
+  eligibility, never produces or adjusts a score, and never selects. This is
+  enforced by the schemas and the storage layer, not by convention (D89).
+- **Criteria are per work package, and must be internally consistent.** Weights
+  sum to 100, no criterion appears twice, and a criterion may only be scored
+  from a response section the department actually asked for. An inconsistent
+  set is stored as a draft with its problems attached and cannot be run.
+- **Missing information is never compliance** (D88). Silence, an unsubstantiated
+  claim and a "not applicable" are all `INSUFFICIENT_INFORMATION`, and the
+  supplier's own stated position stays visible beside the verdict.
+- **Only `READY_FOR_EVALUATION` responses are scored.** Anything else is
+  recorded with the reason it was not assessed, so "which submissions were left
+  out and why" is answerable after the fact.
+- **Runs accumulate and are never overwritten** (D87). Each carries the criteria
+  it applied, so changing them afterwards cannot alter a score a decision cites.
+- **Eligibility is read, not re-derived** (D92). The verdict shown is the one
+  the Milestone 6 gate produced.
+- **A decision is immutable.** A correction is a revocation with its own
+  mandatory reason plus a new decision. At most one live selection per work
+  package.
+- **The supplier sees none of this.** No vendor role holds an `evaluation:*`
+  permission and there is no vendor-facing evaluation route.
 
 ## Related Documents
 

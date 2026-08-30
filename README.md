@@ -6,14 +6,16 @@ An AI-assisted platform designed to support government departments in discoverin
 
 This project is being developed for **Smart India Hackathon 2026**.
 
-> **Project status:** Milestone 8 (Vendor Response and Proposal Collection)
-> complete — for a confirmed work package an official gets a ranked,
-> explainable list of eligible suppliers, shortlists and invites them,
-> configures what response the package requires, and tracks what comes back.
-> The invited supplier drafts a structured response over several sittings,
-> answers each confirmed requirement, attaches documents, reviews and submits
-> it; either side can raise a clarification, and the official moves the
-> submission through review to *ready for evaluation*.
+> **Project status:** Milestone 9 (Evaluation and AI-Assisted Decision Support)
+> complete — the core procurement flow now runs end to end. For a confirmed
+> work package an official gets a ranked, explainable list of eligible
+> suppliers, shortlists and invites them, configures what response the package
+> requires, and collects structured submissions. They then configure weighted
+> evaluation criteria, run a deterministic evaluation, read a ranking in which
+> every position shows the factors that produced it, compare suppliers side by
+> side and requirement by requirement, optionally ask for a clearly-labelled
+> advisory AI reading of a response, and record a selection or rejection with a
+> mandatory reason. **No AI produces a score, a rank or a decision.**
 > See [Current Status](#current-status) below.
 
 ## Problem Statement
@@ -115,7 +117,7 @@ for details and rationale.
 
 ## Current Status
 
-**Milestones 1–8 are complete.**
+**Milestones 1–9 are complete.**
 
 An official signs in, creates a procurement project, runs AI analysis on its
 problem description, reviews the suggested requirements and constraints,
@@ -203,9 +205,42 @@ actors and timestamps, and every lifecycle event is written to the work
 package's audit history. A department cannot read a draft the supplier has
 not submitted.
 
-Milestone 8 stops at *ready for evaluation*: that state records that a
-response is complete enough to be assessed. It is not a score, a rank or an
-award — evaluating responses is Milestone 9.
+**Evaluation and the human decision.** For a work package with responses marked
+*ready for evaluation*, an official configures the weighted criteria it is
+judged on — price, delivery timeline, capacity, certifications and compliance,
+relevant experience, technical response, requirement compliance, and the
+department's own questions. The system refuses a set whose weights do not add
+up to 100, or that would score suppliers on information nobody was asked to
+provide.
+
+Running the evaluation scores every ready response by **arithmetic over the
+figures the suppliers themselves stated** and the records on their capability
+profiles. Every score carries the sentence explaining how it was reached and
+the values it was read from. Responses are compared requirement by requirement
+against four verdicts — compliant, partially compliant, non-compliant,
+insufficient information — and **silence is never counted as compliance**: a
+supplier that ticked "meets" and wrote nothing is reported as insufficient
+information, with its own stated position still visible beside the verdict.
+
+The ranking follows from the scores and nothing else, and every position shows
+its strongest and weakest factors, its compliance gaps, its missing information
+and its supporting evidence. A side-by-side comparison lays the suppliers out
+across eligibility, price, timeline, capacity, certifications, each criterion
+and its weighted contribution.
+
+An official may ask for an **advisory AI reading** of any response: a summary,
+strengths, weaknesses, points needing human attention, and the passage each
+observation was drawn from. It is advisory structurally, not by label — the AI
+schemas carry no score, rank or recommendation field, the readings are stored
+in their own table with no score column, and nothing in the scoring pipeline
+can read them.
+
+The decision is the official's alone. They select or reject a named supplier
+with a mandatory reason, and the system records the decision, the reason, the
+acting user, the moment, the work package, the response and the evaluation
+snapshot it cites. Nothing computes a decision, at most one supplier may be
+selected per work package, and a correction is recorded as a revocation
+alongside the original rather than replacing it.
 
 **Authentication and access control.** Sessions are opaque tokens stored in
 PostgreSQL and delivered in an `HttpOnly; SameSite=Strict` cookie; passwords
@@ -217,8 +252,10 @@ another's projects by changing a URL. The frontend hides controls a role
 cannot use, but the backend is the boundary that actually enforces it. See
 [docs/engineering/security.md](docs/engineering/security.md).
 
-Not implemented: proposal evaluation, document intelligence and response
-ranking (Milestone 9), and vendor gap analysis (Milestone 10). See
+Not implemented: document intelligence over attachment contents, vendor gap
+analysis and procurement analytics (Milestone 10), and advanced semantic
+optimization, learning from recorded decisions and multi-package vendor
+allocation (Milestone 11). See
 [docs/development-roadmap.md](docs/development-roadmap.md) for sequencing
 and [docs/product/hackathon-scope.md](docs/product/hackathon-scope.md) for
 what is explicitly out of scope until requested.
@@ -244,7 +281,7 @@ prints it once.
 cd apps/api
 npm install
 npm run migrate      # create tables
-npm run seed         # create demo organizations and user accounts
+npm run seed         # demo organizations, accounts and the supplier registry
 npm run dev          # http://localhost:4000
 ```
 

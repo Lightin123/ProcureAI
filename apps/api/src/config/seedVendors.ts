@@ -1094,7 +1094,7 @@ export const SEEDED_VENDORS: readonly SeedVendor[] = [
         designation: "Managing Director",
         email: "supplier.energy@procureai.local",
       },
-      industries: ["ENERGY", "INFRASTRUCTURE", "SUSTAINABILITY"],
+      industries: ["INFRASTRUCTURE", "SUSTAINABILITY"],
       subDomains: ["Decentralised renewable energy", "Rural electrification", "Energy storage"],
       solutionTypes: ["PHYSICAL_PRODUCT", "INFRASTRUCTURE_CONSTRUCTION", "OPERATIONAL_SERVICES"],
       headline:
@@ -1157,8 +1157,8 @@ export const SEEDED_VENDORS: readonly SeedVendor[] = [
       gemRegistered: true,
       pastTenderExperience:
         "Empanelled with the state renewable energy agency since 2018 and awarded four district-level electrification packages under competitive tender.",
-      solutionNovelty: "INCREMENTAL",
-      innovationStage: "SCALING",
+      solutionNovelty: "IMPROVED",
+      innovationStage: "SCALED",
       deploymentReadiness: "DEPLOYMENT_READY",
       innovationDescription:
         "The design decision that matters is serviceability: every failure-prone component is replaceable by a district technician with ordinary tools, because the constraint in this sector is maintenance access rather than generation efficiency.",

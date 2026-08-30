@@ -3,8 +3,10 @@
 **Status:** Planned conventions + current actual status. Health,
 authentication, project, and requirement-analysis endpoints are implemented as
 of Milestone 5; work-package vendor matching and shortlisting as of
-Milestone 6, part 2; and vendor invitation, notification and response as of
-Milestone 7. Every other endpoint group below is still planned.
+Milestone 6, part 2; vendor invitation and notification as of Milestone 7;
+response configuration and collection as of Milestone 8; and response
+evaluation, comparison and the human procurement decision as of Milestone 9.
+Every other endpoint group below is still planned.
 
 ## Current Status
 
@@ -251,6 +253,81 @@ anything else, so cross-department access fails by omission.
   `CLARIFICATION_NOT_ANSWERABLE` for one the department raised itself or one
   already answered (D82).
 
+### Response evaluation and decision (Milestone 9)
+
+Mounted at `/api/v1/work-packages/:workPackageId/evaluation`. Government-side
+only: none of its four permissions (`evaluation:read`, `evaluation:configure`,
+`evaluation:manage`, `evaluation:decide`) is held by the `VENDOR` role, so a
+supplier reaches none of these routes at all. Every route resolves the work
+package through the caller's organization before doing anything else.
+
+The order below is the workflow, and it is the order the trust boundary
+requires: **AI analysis (advisory) -> deterministic evaluation -> ranked
+recommendations -> human decision.**
+
+- `GET .../evaluation/criteria-schema` — the criterion catalogue: the eight
+  criterion types, what each is scored from, which response section it needs,
+  whether it takes a threshold, the presets per response type, the compliance
+  vocabulary, and the current `scoringVersion`. Served rather than duplicated
+  in the frontend, so a criterion an official can configure is exactly a
+  criterion the server can score.
+- `GET .../evaluation` — the workspace: the response configuration in force,
+  the department's own questions, the confirmed requirement count, the
+  evaluation criteria and any consistency problems with them, every response
+  with its status, eligibility verdict from the last matching run and whether
+  an advisory reading exists, the newest run with its results, and every
+  decision recorded.
+- `PUT .../evaluation/config` — creates or replaces the criteria. 409
+  `WORK_PACKAGE_NOT_CONFIRMED` unless the package is confirmed; 409
+  `RESPONSE_NOT_CONFIGURED` if nothing has been asked of suppliers; 400
+  `VALIDATION_ERROR` for a `questionId` that is not on **this** work package's
+  response form. An internally inconsistent set is stored as `DRAFT` with the
+  problems returned alongside it and cannot be run; a consistent one is stored
+  as `READY`. Saving bumps `criteriaVersion` and is audited.
+- `POST .../evaluation/run` — scores every response in `READY_FOR_EVALUATION`
+  against the stored criteria and records the run with a frozen copy of them.
+  409 `EVALUATION_NOT_CONFIGURED`, `EVALUATION_CRITERIA_INCONSISTENT` (with the
+  problems in `details`) or `NO_RESPONSES_READY`. Responses in any other state
+  are stored with the reason they were not assessed. A run never overwrites an
+  earlier one.
+- `GET .../evaluation/runs` and `GET .../evaluation/runs/:runId` — the audit
+  trail of scoring: every run, and any one of them exactly as recorded, with
+  the criteria it applied and the scores it produced. A run id belonging to
+  another work package returns 404.
+- `GET .../evaluation/comparison[?runId=]` — the side-by-side comparison, built
+  from one stored run so what is compared is exactly what was calculated.
+  Carries per supplier the criterion scores, the requirement-by-requirement
+  findings, the structured figures, the eligibility verdict **read from the
+  Milestone 6 matching run rather than re-derived**, the latest advisory
+  reading, and any decision. 409 `NO_EVALUATION_RUN` before the first run.
+- `GET .../evaluation/responses/:responseId` — one response's full evaluation:
+  the criterion decomposition with each score's basis and evidence, the
+  compliance table, the missing information, the calculated strengths and gaps,
+  every advisory reading generated for it, and any decision. 409
+  `RESPONSE_NOT_SUBMITTED` for a draft (D83); 404 for a response belonging to
+  another department or another package.
+- `POST .../evaluation/responses/:responseId/ai-analysis` — asks the AI service
+  to read the response and records the result in its own append-only table. It
+  produces no score, no rank and no recommendation, and changes none. 502
+  `AI_OUTPUT_INVALID` if the model returns something that fails validation, 503
+  `AI_SERVICE_UNAVAILABLE` if the service cannot be reached — neither of which
+  affects any stored score.
+- `GET .../evaluation/responses/:responseId/ai-analysis` — every reading
+  generated for that response, newest first. Nothing is ever replaced.
+- `POST .../evaluation/decisions` — records the decision an official made:
+  `{ responseId, decision: SELECTED | REJECTED, reason, evaluationRunId }`. The
+  reason is mandatory and must be at least a sentence. The rank and score are
+  read server-side out of the cited run, never taken from the body. 409
+  `SELECTION_EXISTS` if a supplier is already selected for this package, 409
+  `ALREADY_DECIDED` if this response already carries a live decision, 404 for a
+  run id belonging to another package. **Nothing else in the API writes this
+  table**: no evaluation, ranking or AI call produces a decision.
+- `POST .../evaluation/decisions/:decisionId/revoke` — revokes a live decision
+  with its own mandatory reason. The original row and reason are untouched; 409
+  `DECISION_NOT_ACTIVE` for one already revoked.
+- `GET .../evaluation/decisions` — every decision on the package, live and
+  revoked.
+
 ### Supplier-facing responses (Milestone 8)
 
 Mounted at `/api/v1/vendor/responses`, **before** `/api/v1/vendor`, and a
@@ -424,7 +501,11 @@ above already follow them; the remainder are planned.
   `INTERNAL_ERROR`, `AI_SERVICE_UNAVAILABLE`, `AI_SERVICE_ERROR`,
   `AI_OUTPUT_INVALID`, `INVALID_STATE_TRANSITION`,
   `NO_ACCEPTED_REQUIREMENTS`, `WORK_PACKAGE_NOT_CONFIRMED` (409),
-  `WORK_PACKAGE_DELETED` (409), and the authentication codes below.
+  `WORK_PACKAGE_DELETED` (409), the Milestone 9 codes
+  `EVALUATION_NOT_CONFIGURED` (409), `EVALUATION_CRITERIA_INCONSISTENT` (409),
+  `NO_RESPONSES_READY` (409), `NO_EVALUATION_RUN` (409), `SELECTION_EXISTS`
+  (409), `ALREADY_DECIDED` (409) and `DECISION_NOT_ACTIVE` (409), and the
+  authentication codes below.
   (`SEED_DATA_MISSING` was removed in Milestone 5 along with the seeded
   identity resolver.)
 
@@ -456,9 +537,12 @@ methods, and payloads are not yet designed.
 - `Vendors` — vendor discovery, vendor profile access, shortlisting and
   **vendor invitation with the supplier's accept/decline** are implemented
   (above).
-- `Submissions` — RFI/proposal submission endpoints.
-- `Evaluations` — evaluation and ranking retrieval.
-- `Audit` — audit log retrieval (admin-scoped).
+- `Audit` — audit log retrieval (admin-scoped). Work-package events are
+  already readable through the work-package history endpoint; a
+  cross-organization audit surface is not built.
+
+`Submissions` and `Evaluations` are no longer planned groups: they are
+implemented above as the response and evaluation routers.
 
 ## Backend <-> AI Service Communication (Planned)
 
@@ -467,10 +551,17 @@ methods, and payloads are not yet designed.
   Pydantic models.
 - The AI service is not exposed to the frontend directly (see
   [architecture.md](architecture.md)).
-- Implemented as `POST /internal/v1/requirement-analysis` on the AI service.
-  Request and response are Pydantic-validated there, and the response is
-  **re-validated with zod** in Express before anything is persisted — AI
-  output is never trusted on a single validation (NFR2).
+- Implemented as `POST /internal/v1/requirement-analysis`,
+  `/internal/v1/work-package-decomposition`,
+  `/internal/v1/vendor-capability-insights`,
+  `/internal/v1/response-evaluation-insights` and `/internal/v1/embeddings` on
+  the AI service. Request and response are Pydantic-validated there, and every
+  response is **re-validated with zod** in Express before anything is persisted
+  — AI output is never trusted on a single validation (NFR2).
+- The response-evaluation call is the one that touches a procurement decision,
+  and its schema carries no score, rank, weight or recommendation field on
+  either side of the boundary. The deterministic evaluation reads nothing it
+  returns.
 - Invalid AI output produces 502 `AI_OUTPUT_INVALID`; an unreachable service
   produces 503 `AI_SERVICE_UNAVAILABLE`.
 - The AI service binds to `127.0.0.1` only and has no authentication of its

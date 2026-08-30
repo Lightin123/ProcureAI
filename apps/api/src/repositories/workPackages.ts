@@ -90,7 +90,9 @@ export interface WorkPackageDetail {
 }
 
 export interface WorkPackagesSummary {
+  /** Every row, including the archived and the soft-deleted. Audit count. */
   total: number;
+  /** The working set: what the official is actually deciding on. */
   active: number;
   accepted: number;
   underReview: number;
@@ -98,7 +100,9 @@ export interface WorkPackagesSummary {
   rejected: number;
   manual: number;
   confirmed: number;
+  archived: number;
   deleted: number;
+  isReadyForConfirmation: boolean;
 }
 
 export async function listWorkPackages(
@@ -291,6 +295,9 @@ export async function listWorkPackages(
   }));
 
   const activePackages = packages.filter((p) => !p.isDeleted && p.status !== "ARCHIVED");
+  // Mirrors the gate in validateAndConfirmWorkPackages: rejected packages are
+  // out of the set, and nothing still awaiting a decision may remain in it.
+  const decidablePackages = activePackages.filter((p) => p.status !== "REJECTED");
   const summary: WorkPackagesSummary = {
     total: packages.length,
     active: activePackages.length,
@@ -300,7 +307,13 @@ export async function listWorkPackages(
     rejected: activePackages.filter((p) => p.status === "REJECTED").length,
     manual: activePackages.filter((p) => p.status === "MANUAL").length,
     confirmed: activePackages.filter((p) => p.status === "CONFIRMED").length,
+    archived: packages.filter((p) => !p.isDeleted && p.status === "ARCHIVED").length,
     deleted: packages.filter((p) => p.isDeleted).length,
+    isReadyForConfirmation:
+      decidablePackages.length > 0 &&
+      !decidablePackages.some(
+        (p) => p.status === "UNDER_REVIEW" || p.status === "AI_GENERATED" || p.status === "EDITED",
+      ),
   };
 
   return { packages, summary };
@@ -471,9 +484,76 @@ export async function createAiGeneratedWorkPackages(
   officialId: string,
   suggestedPackages: SuggestedWorkPackageAi[],
 ): Promise<WorkPackageDetail[]> {
+  const insertedIds: string[] = [];
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
+
+    // A re-decomposition replaces the previous decomposition, it does not add to
+    // it. Every package still in the working set is archived with a snapshot of
+    // what it held, so the new set stands alone and the old one stays auditable.
+    const supersededRes = await client.query<{
+      id: string;
+      package_number: string;
+      title: string;
+      description: string;
+      scope: string;
+      complexity: WorkPackageComplexity;
+      priority: WorkPackagePriority;
+      estimated_category: string;
+      deliverables: string[];
+      notes: string | null;
+    }>(
+      `SELECT id, package_number, title, description, scope, complexity, priority,
+              estimated_category, deliverables, notes
+       FROM work_packages
+       WHERE project_id = $1 AND is_deleted = false AND status <> 'ARCHIVED'`,
+      [projectId],
+    );
+
+    for (const p of supersededRes.rows) {
+      await client.query(
+        `INSERT INTO work_package_versions (
+          work_package_id, version_type, title, description, scope,
+          complexity, priority, estimated_category, deliverables, notes,
+          requirement_ids, dependency_ids, created_by
+        ) VALUES (
+          $1, 'ARCHIVED_PRE_REGENERATE', $2, $3, $4, $5, $6, $7, $8, $9,
+          ARRAY(SELECT requirement_id FROM work_package_requirements WHERE work_package_id = $1),
+          ARRAY(SELECT depends_on_work_package_id FROM work_package_dependencies WHERE work_package_id = $1),
+          $10
+        )`,
+        [
+          p.id,
+          p.title,
+          p.description,
+          p.scope,
+          p.complexity,
+          p.priority,
+          p.estimated_category,
+          p.deliverables ?? [],
+          p.notes,
+          officialId,
+        ],
+      );
+
+      await client.query(
+        `UPDATE work_packages SET status = 'ARCHIVED', updated_at = now() WHERE id = $1`,
+        [p.id],
+      );
+
+      await client.query(
+        `INSERT INTO work_package_history (project_id, work_package_id, actor_id, action, old_value, new_value, reason)
+         VALUES ($1, $2, $3, 'DELETED', $4, $5, 'Superseded by a new AI work package decomposition')`,
+        [
+          projectId,
+          p.id,
+          officialId,
+          JSON.stringify({ packageNumber: p.package_number, title: p.title }),
+          JSON.stringify({ status: "ARCHIVED", supersededByAnalysisId: analysisId }),
+        ],
+      );
+    }
 
     // Fetch existing highest package number
     const maxNumberRes = await client.query<{ max_num: number | null }>(
@@ -491,7 +571,6 @@ export async function createAiGeneratedWorkPackages(
     const validReqIds = new Set(reqRes.rows.map((r) => r.id));
 
     const createdPackageMap: Map<string, string> = new Map(); // title -> id
-    const insertedIds: string[] = [];
 
     for (let i = 0; i < suggestedPackages.length; i++) {
       const sp = suggestedPackages[i]!;
@@ -625,7 +704,7 @@ export async function createAiGeneratedWorkPackages(
   }
 
   const { packages } = await listWorkPackages(projectId);
-  return packages;
+  return packages.filter((p) => insertedIds.includes(p.id));
 }
 
 export async function createManualWorkPackage(

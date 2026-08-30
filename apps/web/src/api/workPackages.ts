@@ -98,6 +98,7 @@ export interface WorkPackageSummary {
   rejected: number;
   manual?: number;
   confirmed?: number;
+  archived?: number;
   deleted: number;
   isReadyForConfirmation?: boolean;
 }

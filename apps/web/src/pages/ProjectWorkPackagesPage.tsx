@@ -146,10 +146,26 @@ export function ProjectWorkPackagesPage() {
   const allPackages = view?.packages ?? [];
   const latestAnalysis = view?.analyses[0];
   const summary = view?.summary;
-  const activePackages = allPackages.filter((p) => !p.isDeleted);
-  const acceptedCount = summary?.accepted ?? activePackages.filter((p) => p.status === "ACCEPTED" || p.status === "CONFIRMED").length;
-  const awaitingCount = summary?.suggested ?? summary?.underReview ?? activePackages.filter((p) => p.status !== "ACCEPTED" && p.status !== "CONFIRMED" && p.status !== "REJECTED").length;
-  const isReadyToConfirm = summary?.isReadyForConfirmation ?? (activePackages.length > 0 && activePackages.every((p) => p.status === "ACCEPTED" || p.status === "CONFIRMED"));
+  // A merged-away or split-away package keeps its row for the audit trail but is
+  // no longer part of what the official is deciding on, so it is not counted here.
+  const activePackages = allPackages.filter(
+    (p) => !p.isDeleted && p.status !== "ARCHIVED" && p.status !== "SUPERSEDED",
+  );
+  const acceptedCount =
+    summary?.accepted ??
+    activePackages.filter((p) => p.status === "ACCEPTED" || p.status === "CONFIRMED").length;
+  const awaitingCount =
+    summary?.suggested ??
+    (summary !== undefined && summary.underReview !== undefined
+      ? summary.underReview + (summary.edited ?? 0)
+      : activePackages.filter(
+          (p) =>
+            p.status !== "ACCEPTED" && p.status !== "CONFIRMED" && p.status !== "REJECTED",
+        ).length);
+  const isReadyToConfirm =
+    summary?.isReadyForConfirmation ??
+    (activePackages.length > 0 &&
+      activePackages.every((p) => p.status === "ACCEPTED" || p.status === "CONFIRMED"));
 
   // Filter packages
   const filteredPackages = useMemo(() => {
@@ -211,11 +227,20 @@ export function ProjectWorkPackagesPage() {
     setSelectedIds((prev) => (selected ? [...prev, id] : prev.filter((item) => item !== id)));
   };
 
+  // Only a package still in the working set can take part in a consolidation.
+  const selectableFilteredPackages = useMemo(
+    () =>
+      filteredPackages.filter(
+        (p) => !p.isDeleted && p.status !== "ARCHIVED" && p.status !== "SUPERSEDED",
+      ),
+    [filteredPackages],
+  );
+
   const handleSelectAll = () => {
-    if (selectedIds.length === filteredPackages.filter((p) => !p.isDeleted).length) {
+    if (selectedIds.length === selectableFilteredPackages.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredPackages.filter((p) => !p.isDeleted).map((p) => p.id));
+      setSelectedIds(selectableFilteredPackages.map((p) => p.id));
     }
   };
 
@@ -326,7 +351,7 @@ export function ProjectWorkPackagesPage() {
 
               <div className="gov-desc-item">
                 <dt className="gov-desc-term">Active Work Packages</dt>
-                <dd className="gov-desc-val">{allPackages.filter((p) => !p.isDeleted).length}</dd>
+                <dd className="gov-desc-val">{summary?.active ?? activePackages.length}</dd>
               </div>
 
               <div className="gov-desc-item">
@@ -358,11 +383,11 @@ export function ProjectWorkPackagesPage() {
                   }
                 >
                   <SparklesIcon size={16} />
-                  {allPackages.length === 0 ? "Generate Work Packages (AI)" : "Re-decompose Packages (AI)"}
+                  {activePackages.length === 0 ? "Generate Work Packages (AI)" : "Re-decompose Packages (AI)"}
                 </button>
               )}
 
-              {canDecompose && allPackages.length === 0 && (
+              {canDecompose && activePackages.length === 0 && (
                 <button
                   type="button"
                   className="gov-btn gov-btn--secondary"
@@ -574,7 +599,7 @@ export function ProjectWorkPackagesPage() {
                     type="checkbox"
                     checked={
                       selectedIds.length > 0 &&
-                      selectedIds.length === filteredPackages.filter((p) => !p.isDeleted).length
+                      selectedIds.length === selectableFilteredPackages.length
                     }
                     onChange={handleSelectAll}
                   />
@@ -606,11 +631,11 @@ export function ProjectWorkPackagesPage() {
                   No Work Packages Found
                 </h4>
                 <p style={{ margin: "0 0 16px", color: "var(--gov-text-secondary)", fontSize: "14px" }}>
-                  {allPackages.length === 0
+                  {activePackages.length === 0
                     ? "Generate packages using the AI Assistant above or create packages manually."
                     : "No packages match the active search and filter criteria."}
                 </p>
-                {canDecompose && allPackages.length === 0 && (
+                {canDecompose && activePackages.length === 0 && (
                   <button
                     type="button"
                     className="gov-btn gov-btn--primary"

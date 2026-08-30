@@ -9,7 +9,7 @@ import { SessionCheck } from "./SessionCheck.js";
  * rejects every unauthenticated request regardless of what the browser renders.
  */
 export function RequireAuth() {
-  const { status } = useAuth();
+  const { status, signedOut } = useAuth();
   const location = useLocation();
 
   if (status === "checking") {
@@ -17,7 +17,11 @@ export function RequireAuth() {
   }
 
   if (status === "anonymous") {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+    // A deliberate sign-out is not an interruption, so nothing is remembered:
+    // the next sign-in starts at that role's own landing page rather than the
+    // previous user's last screen. Only a lost or expired session is resumed.
+    const state = signedOut ? null : { from: location.pathname + location.search };
+    return <Navigate to="/login" replace state={state} />;
   }
 
   return <Outlet />;

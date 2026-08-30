@@ -116,7 +116,7 @@ export function LoginPage() {
         <div className="portal-container gov-login__grid">
           <section className="gov-login__identity">
             <div className="gov-login__emblem" aria-hidden="true">
-              <EmblemIcon size={54} />
+              <EmblemIcon size={70} />
             </div>
             <p className="gov-login__ministry">
               Ministry of Commerce &amp; Industry · Government of India

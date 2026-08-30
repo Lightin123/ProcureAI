@@ -144,14 +144,17 @@ official portal rather than a generic product login.
   sign-in with an explanation, distinct from simply not being signed in.
 
 **Where sign-in sends you.** When a guard interrupts someone mid-navigation it
-remembers where they were heading, and sign-in returns them there. That
-remembered location belongs to whoever was interrupted, though, which is not
-necessarily whoever signs in next — after a sign-out and a switch of account it
-can point at a section the new user may not open. The redirect therefore
-honours it only if the signed-in user can actually reach it, and otherwise
-starts them at their own landing section. Route permissions and the
-landing-section rule live in one place (`apps/web/src/auth/routeAccess.ts`) so
-the guards and the redirect cannot disagree.
+remembers where they were heading, and sign-in returns them there. Only an
+interruption is remembered: a deliberate sign-out is a decision to leave, so
+the guard records nothing and the next sign-in starts at that role's own
+landing section — the procurement register, the supplier workspace or the
+supplier registry — rather than the previous user's last screen. Even a
+remembered location belongs to whoever was interrupted, which is not
+necessarily whoever signs in next, so the redirect honours it only if the
+signed-in user can actually reach it and otherwise falls back to the same
+landing section. Route permissions and the landing-section rule live in one
+place (`apps/web/src/auth/routeAccess.ts`) so the guards and the redirect
+cannot disagree.
 
 Navigation and action controls are filtered by permission, so a user is not
 shown doors they cannot open. This is a usability measure only — the backend

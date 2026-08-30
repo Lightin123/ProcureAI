@@ -8,7 +8,7 @@ export function GovernmentFooter() {
         <div className="portal-container gov-footer__grid">
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <EmblemIcon size={28} />
+              <EmblemIcon size={35} />
               <strong style={{ fontSize: "16px", color: "#FFFFFF" }}>ProcureAI Portal</strong>
             </div>
             <p className="gov-footer__about">

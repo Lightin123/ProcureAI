@@ -27,10 +27,16 @@ export function GovernmentHeader() {
 
   async function handleSignOut() {
     setSigningOut(true);
-    await logout();
-    // state: null clears the location the route guard captured on the way out,
-    // so the next person to sign in is not sent to this user's last page.
-    await navigate("/login", { replace: true, state: null });
+    try {
+      await logout();
+    } finally {
+      // state: null carries no remembered location, so the next person to sign
+      // in starts at their own role's landing page rather than this user's last
+      // page. The route guard makes the same choice for a deliberate sign-out;
+      // going straight to /login here just avoids rendering through it.
+      setSigningOut(false);
+      await navigate("/login", { replace: true, state: null });
+    }
   }
 
   return (
@@ -57,16 +63,13 @@ export function GovernmentHeader() {
         <div className="portal-container gov-main-header__inner">
           <Link to={homePath} className="gov-main-header__brand" aria-label="ProcureAI Home">
             <div className="gov-main-header__emblem" aria-hidden="true">
-              <EmblemIcon size={38} />
+              <EmblemIcon size={60} />
             </div>
             <div className="gov-main-header__titles">
               <div className="gov-main-header__gov-line">
                 Ministry of Commerce &amp; Industry · Government of India
               </div>
-              <div className="gov-main-header__portal-name">
-                ProcureAI
-                <span className="gov-main-header__portal-badge">Official Portal</span>
-              </div>
+              <div className="gov-main-header__portal-name">ProcureAI</div>
               <div className="gov-main-header__tagline">
                 Public Procurement Decision Support Platform
               </div>

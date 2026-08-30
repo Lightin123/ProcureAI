@@ -17,6 +17,12 @@ interface AuthContextValue {
   user: AuthenticatedUser | undefined;
   sessionExpired: boolean;
   /**
+   * True only after a deliberate sign-out. A route guard must not remember the
+   * page someone was on when they chose to leave it, so the next sign-in starts
+   * at that role's own landing page rather than the previous user's last screen.
+   */
+  signedOut: boolean;
+  /**
    * Resolves with the signed-in user. Callers need the identity synchronously
    * to decide where to navigate; reading it back from context immediately after
    * would see the previous render's value and send everyone to a fallback.
@@ -33,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("checking");
   const [user, setUser] = useState<AuthenticatedUser | undefined>(undefined);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
 
   // Session restoration. The cookie is the persistence; the browser sends it,
   // and the server decides. Nothing about the identity is stored client-side.
@@ -41,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     fetchCurrentUser(controller.signal)
       .then((current) => {
+        setSignedOut(false);
         setUser(current);
         setStatus("authenticated");
       })
@@ -65,6 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // is told their session ended. UNAUTHENTICATED means no cookie at all,
       // which is simply "not signed in" and needs no explanation.
       setSessionExpired(code === "SESSION_EXPIRED");
+      // An expired or absent cookie interrupted the user; it is not a choice to
+      // leave, so the page they were on stays worth returning to.
+      setSignedOut(false);
       setUser(undefined);
       setStatus("anonymous");
     });
@@ -77,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const authenticated = await loginRequest(email, password);
     setSessionExpired(false);
+    setSignedOut(false);
     setUser(authenticated);
     setStatus("authenticated");
     return authenticated;
@@ -87,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // to re-enter the password they have just chosen.
     const authenticated = await registerRequest(input);
     setSessionExpired(false);
+    setSignedOut(false);
     setUser(authenticated);
     setStatus("authenticated");
     return authenticated;
@@ -103,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } finally {
       setSessionExpired(false);
+      setSignedOut(true);
       setUser(undefined);
       setStatus("anonymous");
     }
@@ -114,8 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, sessionExpired, login, register, logout, hasPermission }),
-    [status, user, sessionExpired, login, register, logout, hasPermission],
+    () => ({ status, user, sessionExpired, signedOut, login, register, logout, hasPermission }),
+    [status, user, sessionExpired, signedOut, login, register, logout, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

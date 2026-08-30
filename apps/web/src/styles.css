@@ -145,7 +145,11 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  /* Vertical only. The shorthand would override the horizontal gutter this
+     element inherits from .portal-container, putting the national strip 20px
+     to the left of every other section on the page. */
+  padding-top: 6px;
+  padding-bottom: 6px;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -229,8 +233,12 @@ a:hover {
 .gov-main-header__emblem {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 70px;
+  justify-content: flex-start;
+  /* Hugs the emblem rather than centring it in a fixed box, so the artwork
+     starts on the same gutter as the national strip above and the page
+     content below. A fixed width would inset it by whatever the box is
+     wider than the image. */
+  width: auto;
   height: 70px;
   background: white;
   border: none;
@@ -260,18 +268,6 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.gov-main-header__portal-badge {
-  font-size: 11px;
-  font-weight: 600;
-  background-color: var(--gov-saffron-light);
-  color: var(--gov-saffron-dark);
-  border: 1px solid #FFE0B2;
-  padding: 1px 6px;
-  border-radius: var(--gov-radius-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .gov-main-header__tagline {
@@ -1638,12 +1634,11 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   margin-bottom: 18px;
 }
 
-/* Strip the white/grid PNG background from the emblem image */
+/* The emblem PNG carries its own alpha, so it needs no blend-mode trick. */
 .gov-login__emblem img,
 .gov-session-check__emblem img,
 .gov-main-header__emblem img {
   background: transparent;
-  mix-blend-mode: multiply;
 }
 
 .gov-login__ministry {

@@ -5,6 +5,8 @@ from app.schemas import (
     CapabilityInsightsResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
+    ResponseEvaluationRequest,
+    ResponseEvaluationResponse,
     WorkPackageDecompositionRequest,
     WorkPackageDecompositionResponse,
 )
@@ -27,6 +29,10 @@ class RequirementAnalysisProvider(Protocol):
     async def capability_insights(
         self, request: CapabilityInsightsRequest
     ) -> CapabilityInsightsResponse: ...
+
+    async def response_insights(
+        self, request: ResponseEvaluationRequest
+    ) -> ResponseEvaluationResponse: ...
 
 
 class ProviderError(RuntimeError):

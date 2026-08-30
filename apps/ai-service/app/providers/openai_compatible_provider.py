@@ -16,6 +16,12 @@ from app.prompts.work_package_decomposition import (
     SYSTEM_PROMPT as WP_SYSTEM_PROMPT,
     build_work_package_prompt,
 )
+from app.prompts.response_evaluation import (
+    PROMPT_VERSION as RESPONSE_PROMPT_VERSION,
+    SCHEMA_INSTRUCTION as RESPONSE_SCHEMA_INSTRUCTION,
+    SYSTEM_PROMPT as RESPONSE_SYSTEM_PROMPT,
+    build_user_prompt as build_response_prompt,
+)
 from app.prompts.vendor_capability import (
     PROMPT_VERSION as CAPABILITY_PROMPT_VERSION,
     SYSTEM_PROMPT as CAPABILITY_SYSTEM_PROMPT,
@@ -26,6 +32,10 @@ from app.schemas import (
     CapabilityInsight,
     CapabilityInsightsRequest,
     CapabilityInsightsResponse,
+    EvaluationEvidence,
+    EvaluationInsight,
+    ResponseEvaluationRequest,
+    ResponseEvaluationResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     SuggestedClarification,
@@ -111,6 +121,18 @@ class CapabilityPayload(BaseModel):
     strengths: list[CapabilityInsight]
     gaps: list[CapabilityInsight]
     suggested_opportunity_areas: list[str]
+
+
+class ResponseInsightPayload(BaseModel):
+    """There is deliberately no score, rank or recommendation field here."""
+
+    summary: str
+    technical_fit: str = ""
+    experience_relevance: str = ""
+    strengths: list[EvaluationInsight] = []
+    weaknesses: list[EvaluationInsight] = []
+    attention_points: list[EvaluationInsight] = []
+    evidence: list[EvaluationEvidence] = []
 
 
 CAPABILITY_SCHEMA_INSTRUCTION = (
@@ -397,5 +419,87 @@ class OpenAICompatibleProvider:
 
         raise ProviderError(
             f"The model did not return a valid assessment after "
+            f"{self._settings.ai_max_attempts} attempt(s): {last_error}."
+        )
+
+    async def response_insights(
+        self, request: ResponseEvaluationRequest
+    ) -> ResponseEvaluationResponse:
+        start_time = time.time()
+
+        user_prompt = build_response_prompt(
+            package_number=request.package_number,
+            package_title=request.package_title,
+            package_scope=request.package_scope,
+            requirements=[item.model_dump() for item in request.requirements],
+            response_type=request.response_type,
+            supplier_name=request.supplier_name,
+            sections=[item.model_dump() for item in request.sections],
+            requirement_answers=[item.model_dump() for item in request.requirement_answers],
+            question_answers=[item.model_dump() for item in request.question_answers],
+            document_titles=request.document_titles,
+        )
+
+        messages = _json_mode_messages(
+            f"{RESPONSE_SYSTEM_PROMPT}\n\n{RESPONSE_SCHEMA_INSTRUCTION}", user_prompt
+        )
+
+        last_error: str | None = None
+
+        for attempt in range(1, self._settings.ai_max_attempts + 1):
+            try:
+                completion = await self._client.chat.completions.create(
+                    model=self._settings.ai_model,
+                    max_tokens=self._settings.ai_max_tokens,
+                    messages=messages,  # type: ignore[arg-type]
+                    response_format={"type": "json_object"},
+                )
+            except openai.RateLimitError as error:
+                raise ProviderError(
+                    "The AI provider's rate limit was reached. Wait a moment and try again."
+                ) from error
+            except openai.AuthenticationError as error:
+                raise ProviderError(
+                    "The AI provider rejected the configured API key."
+                ) from error
+            except openai.APIStatusError as error:
+                raise _status_error(self._settings, error) from error
+            except openai.APIConnectionError as error:
+                raise ProviderError(
+                    f"Could not reach {self._settings.ai_base_url}."
+                ) from error
+
+            choice = completion.choices[0] if completion.choices else None
+            content = choice.message.content if choice and choice.message else None
+
+            if not content:
+                last_error = "the model returned an empty response"
+                continue
+
+            try:
+                validated = ResponseInsightPayload.model_validate_json(content)
+            except ValidationError as error:
+                last_error = f"output failed schema validation ({error.error_count()} issue(s))"
+                logger.warning(
+                    "Attempt %s/%s: %s", attempt, self._settings.ai_max_attempts, last_error
+                )
+                continue
+
+            return ResponseEvaluationResponse(
+                summary=validated.summary,
+                technical_fit=validated.technical_fit,
+                experience_relevance=validated.experience_relevance,
+                strengths=validated.strengths,
+                weaknesses=validated.weaknesses,
+                attention_points=validated.attention_points,
+                evidence=validated.evidence,
+                model=self._settings.ai_model,
+                provider=self.name,
+                prompt_version=RESPONSE_PROMPT_VERSION,
+                response_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        raise ProviderError(
+            f"The model did not return a valid reading after "
             f"{self._settings.ai_max_attempts} attempt(s): {last_error}."
         )

@@ -214,22 +214,26 @@ Against the functional requirements above:
 | FR4.3 — official reviews/adjusts the candidate vendor list | Implemented: ranked cards with per-dimension scores, inspectable exclusions, side-by-side comparison, shortlisting, recalculation |
 | FR4.4 — invite and engage shortlisted suppliers | Implemented (Milestone 7): shortlist with a recorded reason, invitation with instructions and a response date, in-portal notification, and the supplier's acceptance or reasoned decline |
 | FR5.1 — collect RFI responses or proposal documents for a work package | Implemented (Milestone 8). The official configures what is required — expression of interest, RFI, proposal or quotation — with a deadline, required and optional sections, custom questions, and whether clarifications and documents are allowed. The invited supplier drafts a resumable response, answers each confirmed requirement individually, attaches documents, and submits it against server-side validation of everything mandatory. Clarifications run in both directions with their actors and timestamps preserved, and the official tracks each response through review to `READY_FOR_EVALUATION` |
-| FR6 — document intelligence | Not implemented |
-| FR7 — evaluation | Not implemented (this is response evaluation; see Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md), distinct from the vendor-ranking work in FR4). Milestone 8 collects and organises the responses it will read, and deliberately produces no score, rank or comparison of its own |
-| FR8 — ranking and recommendation | Deferred as specified (this is ranking of evaluated *responses*, and FR8.4 combination recommendation, both Milestone 9+). The ranking of discovered *candidates* that FR4 needs is implemented: seven deterministic weighted dimensions per work package, each individually inspectable, every recommendation carrying its evidence |
-| FR9 — human review and decision | Implemented for every AI-generated suggestion built so far (requirements, work packages); FR9.2 (recording a final procurement decision) awaits Milestone 9 |
+| FR6 — document intelligence | Not implemented for attachment *contents*. What Milestone 9 does read is the structured information a supplier submitted through the response form — quoted value, duration, committed team size, compliance confirmation, requirement-by-requirement positions and written answers — and compares it against the procurement's own stated ceilings, deadlines and mandatory certifications. Parsing an uploaded PDF is still not done; attachment **titles** only are passed to the AI service |
+| FR7 — evaluation | Implemented (Milestone 9). An official configures weighted criteria per work package — price, timeline, capacity, certifications, experience, technical response, requirement compliance and the department's own questions — validated for internal consistency and refused where they would score suppliers on information nobody was asked for. Every ready response is scored deterministically, compared requirement by requirement against four verdicts with missing information never counted as compliance, and each score carries the basis and evidence it was read from. AI analysis is advisory, separate and incapable of moving a score. See Part 2 of [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md) |
+| FR8 — ranking and recommendation | Implemented for responses (Milestone 9): a deterministic ranking over the configured criteria, in which every position carries its total, its criterion-level scores, its strongest and weakest factors measured in weighted contribution, its compliance gaps, its missing information and its supporting evidence, alongside a side-by-side comparison. FR8.4 (recommending a *combination* of vendors across packages) is deliberately deferred to Milestone 11. The ranking of discovered *candidates* that FR4 needs was already implemented: seven deterministic weighted dimensions per work package, each individually inspectable |
+| FR9 — human review and decision | Implemented, including **FR9.2**: an official selects or rejects a named response with a mandatory reason, and the decision is recorded with its author, moment, work package, vendor and the evaluation snapshot it cites. No automated path writes a decision, at most one supplier may be selected per work package, and a correction is a revocation recorded alongside the original rather than replacing it |
 | FR10 — access control | Implemented (Milestone 5): three roles, permission-based authorization, organization scoping enforced on every query |
 | FR11.1 — auditability of key actions | Implemented for requirement and work-package decisions, stage transitions, vendor verification decisions, shortlist and invitation acts, and every response lifecycle event — each with its actor, moment and, where one is required, its stated reason. A supplier's own acts are attributed to the supplier's user. A general-purpose audit log across all data areas does not exist |
 
 Against the non-functional requirements: **NFR1** is met for requirement
-analysis, work package generation, and vendor matching — every suggestion
-and every match score carries a rationale. **NFR2** is met: AI output is
+analysis, work package generation, vendor matching and response evaluation —
+every suggestion, every match score and every criterion score carries a
+rationale, and an evaluation score additionally names the values it was
+calculated from. **NFR2** is met: AI output is
 schema-validated by Pydantic and re-validated by zod before persistence.
 **NFR3** is met: authentication and role-based authorization protect every
 non-public endpoint (Milestone 5), and input is validated at the boundary.
-**NFR4** is substantially met — stage transitions, review decisions, and
-vendor verification decisions are recorded, though a general-purpose audit
-log across every data area does not exist. **NFR8** is met for requirements
+**NFR4** is substantially met — stage transitions, review decisions, vendor
+verification decisions, shortlist and invitation acts, every response
+lifecycle event, and every evaluation and procurement decision are recorded
+with their actor, moment and stated reason, though a general-purpose audit log
+across every data area does not exist. **NFR8** is met for requirements
 and work packages via the provenance model. NFR6 and NFR7 are being
 observed. NFR5 and NFR9 remain unaddressed as stated requirements rather
 than implemented features.

@@ -1,6 +1,6 @@
 # Database Design
 
-**Status:** Substantially implemented through Milestone 7. Migration `001_init.sql` (Milestone 2) created `organizations`,
+**Status:** Substantially implemented through Milestone 9. Migration `001_init.sql` (Milestone 2) created `organizations`,
 `users`, and `procurement_projects`; `002_requirement_analysis.sql`
 (Milestone 3) added requirement/clarification tracking;
 `003_work_packages.sql` (Milestone 4) added work-package decomposition and
@@ -14,10 +14,12 @@ per-supplier match results, and the shortlist;
 columns to the current embedding model's 384 dimensions and added
 `vendor_profiles.semantic_document`; `008_vendor_engagement.sql`
 (Milestone 7) added work-package invitations and linked the existing vendor
-notifications to them. Evaluation of vendor
-**responses** (Evaluation Criteria/Templates, Candidate Evaluations,
-Evaluation Runs over submitted proposals) remains conceptual and undesigned
-— see [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
+notifications to them; `009_vendor_responses.sql` (Milestone 8) added the
+response configuration, the response itself and its answers, attachments and
+clarifications; and `010_evaluation.sql` (Milestone 9) added evaluation
+criteria, evaluation runs and their per-response results, the advisory AI
+analysis and the recorded human decision — see
+[../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md).
 
 This document maps the data areas implied by the product requirements and
 architecture. The Implemented Schema section below reflects what actually
@@ -305,17 +307,20 @@ column design should be inferred from the grouping or ordering.
 
 ### Evaluation and Recommendations — Partly Realised for Matching (Milestone 6)
 
-Three of the four areas below now have a concrete implementation **for
-vendor matching specifically**: ranking suppliers against a confirmed work
-package from their own capability data. None of them is implemented for the
-evaluation of vendor **responses** — scoring what a supplier actually
-submits, against criteria defined for that procurement — which is
-Milestone 9 and remains undesigned.
+Three of the four areas below have a concrete implementation **for vendor
+matching**: ranking suppliers against a confirmed work package from their own
+capability data. All four now also have one for the evaluation of vendor
+**responses** — scoring what a supplier actually submitted, against criteria
+defined for that procurement — see
+[Evaluation and Decision (Milestone 9)](#evaluation-and-decision-milestone-9).
+What remains unbuilt is only the *reusable template* half of the first area.
 
-- **Evaluation Criteria / Templates** — **not implemented.** Reusable
-  definitions of evaluation criteria (e.g. name, description, scoring
-  approach, weight) that can be applied across projects or work packages,
-  rather than being redefined each time. Supports FR7.7's
+- **Evaluation Criteria / Templates** — **built per work package, not as a
+  reusable library.** `work_package_evaluation_criteria` holds a criterion's
+  name, description, type, weight, direction and optional threshold, and the
+  API serves presets per response type. Reusable definitions applied across
+  projects — rather than configured per package from a preset — remain
+  unimplemented. Supports FR7.7's
   deterministic-vs-AI-assisted split (see
   [../product/requirements.md](../product/requirements.md)). Matching's
   ranking dimensions and weights are code-level and versioned per run
@@ -514,10 +519,106 @@ Milestone 7 is the seam and was not changed.
   the same reason: "is this notification about this response" is not a
   question a URL string answers (D74).
 
-No evaluation table exists. `READY_FOR_EVALUATION` records that a response is
-complete enough to be assessed and nothing more — no score, no rank, no
-comparison. Milestone 9's evaluation entity is deliberately unmodelled until
-that workflow is specified, exactly as the response was through Milestone 7.
+`READY_FOR_EVALUATION` records that a response is complete enough to be
+assessed and nothing more — no score, no rank, no comparison. The evaluation
+entities are Milestone 9's, below.
+
+## Evaluation and Decision (Milestone 9)
+
+Added by `apps/api/migrations/010_evaluation.sql`. Six new tables, six new
+enums, six new labels on `work_package_history_action`. The
+`READY_FOR_EVALUATION` response from Milestone 8 is the seam and was not
+changed: no column was added to `work_package_responses` and no response
+status was added, because an assessment is not a property of the submission.
+
+- `work_package_evaluation_configs` — what responses to one work package are
+  scored on, **one row per work package** (unique on `work_package_id`), for
+  the same reason there is one response configuration: suppliers who are
+  compared have to be compared on the same criteria (D86). Carries `status`
+  (`DRAFT` / `READY`), `criteria_version` (bumped on every saved change),
+  `title`, `notes`, and the configuring and last-updating actors. Only a
+  `READY` configuration can be run, which is what stops a half-weighted
+  criteria set producing a ranking somebody reads as final.
+
+- `work_package_evaluation_criteria` — the criteria themselves, one row each.
+  `criterion_key` (a stable slug carried into the stored score rows so a result
+  stays readable without a join), `criterion_type`, `direction`, `label`,
+  `description`, `weight`, an optional `target_value` (a budget ceiling, a
+  maximum duration, a minimum team size), an optional `question_id` and
+  `display_order`. A table rather than a jsonb array on the configuration,
+  because a `CUSTOM` criterion points at one of the department's own response
+  questions and a foreign key is what stops it pointing at a question on
+  another work package's form. A CHECK ties `question_id` to exactly the
+  `CUSTOM` type. Weights must sum to 100 — not expressible row by row, so it is
+  validated on write and again before a run, and the run's snapshot records
+  what was actually applied.
+
+- `evaluation_criterion_type` — `PRICE`, `TIMELINE`, `CAPACITY`, `COMPLIANCE`,
+  `EXPERIENCE`, `TECHNICAL`, `REQUIREMENT_COMPLIANCE`, `CUSTOM`. The type is
+  not decoration: it decides which stored field the deterministic scorer reads
+  and which response section must be switched on for the criterion to be
+  answerable at all. That pairing is what makes the internal-consistency check
+  possible — a department cannot score suppliers on a price it never asked any
+  of them to quote.
+
+- `work_package_evaluation_runs` — one deterministic pass over the responses,
+  the counterpart of `work_package_match_runs` (D68) for responses rather than
+  suppliers, and for the same reason. Carries `config_id` (`ON DELETE SET
+  NULL`, so deleting a configuration cannot destroy the record of what ran
+  under it), `scoring_version`, `criteria_version`, a **`criteria_snapshot`**
+  jsonb holding the exact criteria applied, a `request_snapshot` jsonb holding
+  the response type, the section modes, the deadline, the confirmed
+  requirements and the resolved thresholds, plus the counts and the requesting
+  actor. Runs accumulate and are never updated: re-evaluating after a
+  resubmission adds a record rather than destroying the one a decision may
+  already cite (D87).
+
+- `work_package_evaluation_results` — one row per assessed response per run,
+  unique on `(run_id, response_id)`. `ranked` and `rank_position` (a CHECK ties
+  them together), `total_score` as `numeric(6,2)`, and jsonb columns holding
+  `criterion_scores` (per criterion: score, weight, weighted contribution,
+  method, the basis sentence, and the evidence lines it was read from),
+  `compliance` (one entry per confirmed requirement), `compliance_summary`,
+  `missing_information`, `strengths`, `gaps`, and a `structured_summary` of the
+  facts the comparison lays side by side. A response that could not be ranked
+  is stored too, with `exclusion_reason` and a CHECK requiring one — a
+  department is entitled to ask which submissions were not assessed and why,
+  the rule D68 established for the matching gate.
+
+- `work_package_response_ai_analyses` — the advisory reading of one response.
+  Deliberately a **separate table with no score column of any kind**, and no
+  reference from any score to any row in it: "the model quietly moved a score"
+  is not a failure this schema can express (D89). Carries `summary`,
+  `technical_fit`, `experience_relevance`, `strengths`, `weaknesses`,
+  `attention_points`, an `evidence` jsonb of section-and-quote pairs, the
+  provider, model, prompt version and response time, the generating actor, and
+  an optional `evaluation_run_id` for context only. Append-only: a regeneration
+  is a new row, so "what AI analysis was generated" has a complete answer
+  rather than a latest one.
+
+- `work_package_response_decisions` — the human decision, and the only place in
+  this system where a supplier is chosen. One row per decision rather than one
+  per work package: an official selects one supplier and may separately record
+  why each of the others was rejected, and both need an actor, a moment and a
+  **mandatory** `reason` (`NOT NULL`, with a non-empty CHECK). Carries
+  `decision` (`SELECTED` / `REJECTED`), `status` (`ACTIVE` / `REVOKED`), the
+  `evaluation_run_id` the official was looking at, and `rank_at_decision` /
+  `score_at_decision` read server-side from the stored result rather than
+  accepted from the request — the rule D69 set for shortlists, applied to the
+  decision that matters most (D90).
+
+  Two partial unique indexes do the enforcing: one live decision per response,
+  and **at most one live `SELECTED` per work package**. A decision is
+  immutable; correcting one is a revocation (`revoked_by`, `revoked_at`,
+  `revocation_reason`, itself required by a CHECK) that leaves the original row
+  and its reason in place, plus a new decision. An `UPDATE` would erase what
+  the department first decided, which is the record an auditor is looking for.
+
+- `work_package_history_action` gains `EVALUATION_CONFIGURED`,
+  `EVALUATION_RUN`, `EVALUATION_AI_ANALYSIS`, `VENDOR_SELECTED`,
+  `VENDOR_REJECTED` and `DECISION_REVOKED` — the same reasoning as D73. The run
+  entry carries the ranking that was shown; the decision entry carries the
+  official's reason.
 
 ## Embeddings / Vector Search
 
@@ -589,18 +690,20 @@ single global pattern decided here.
 
 ## Explicitly Not Yet Decided
 
-- Detailed table/column schema for reusable evaluation criteria/templates and
-  for candidate evaluations of vendor **responses** (Milestone 9) — see
-  [../ai/evaluation-and-ranking.md](../ai/evaluation-and-ranking.md). The
-  matching-side equivalents are now built (`work_package_match_runs` /
-  `work_package_match_results`); see
-  [../ai/vendor-discovery.md](../ai/vendor-discovery.md).
+- **Reusable** evaluation criteria templates across work packages. Milestone 9
+  builds criteria **per work package** (`work_package_evaluation_configs` /
+  `work_package_evaluation_criteria`) with served presets per response type; an
+  organisation-level template library is not modelled, and was not needed to
+  make one procurement evaluable.
 - Whether an unverified vendor's embeddings/matching data are generated and
   stored before verification, or only after.
-- The specific mechanism used to satisfy traceability in
+- Whether the traceability mechanism in
   [AI Suggestions vs. Confirmed State](#ai-suggestions-vs-confirmed-state)
-  for response **evaluation** specifically. For matching the question is now
-  answered, and neither the requirements (D28) nor the work-package pattern
+  needs anything further for response evaluation. Milestone 9 answered it the
+  way matching did and then went further: the deterministic result and the AI
+  reading live in **different tables**, the AI table has no score column of any
+  kind, and a decision cites the run it was taken from. For matching the
+  question was already answered, and neither the requirements (D28) nor the work-package pattern
   was the answer: matching produces a *ranking over existing data* rather
   than *new suggested data*, so the mechanism is run provenance (D68) plus a
   shortlist entry that records the official's own act and the run it was
@@ -609,12 +712,14 @@ single global pattern decided here.
   every shortlist and invitation act is written to `work_package_history`
   (D73). Whether this generalises to evaluating submitted responses is
   untested.
-- Retention and comparison UX for multiple Evaluation / Recommendation Runs.
-- Schema for vendor submissions/responses (Milestone 8) and Vendor
-  Memberships / Representatives (multiple staff per vendor organization).
-  The latter is now slightly more pressing: `work_package_invitations`
-  records `responded_by`, so an invitation is answered by a named person,
-  but a vendor organization still has exactly one user account to name.
+- Retention policy for evaluation and matching runs. Every run is kept and
+  nothing prunes them; the workspace reads the newest and the audit reads them
+  all, which is correct but unbounded.
+- Vendor Memberships / Representatives (multiple staff per vendor
+  organization). More pressing again: `work_package_invitations` records
+  `responded_by` and `work_package_responses` records `submitted_by`, so both
+  are attributable to a named person, but a vendor organization still has
+  exactly one user account to name.
 
 ## Related Documents
 

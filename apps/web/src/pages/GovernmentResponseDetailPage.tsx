@@ -203,12 +203,20 @@ export function GovernmentResponseDetailPage() {
             : `${response.legalName ?? response.organizationName} · ${response.responseType.replace(/_/g, " ")}`
         }
         action={
-          <Link
-            className="gov-btn gov-btn--secondary"
-            to={`/projects/${projectId}/work-packages/${packageId}/responses`}
-          >
-            Back to responses
-          </Link>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Link
+              className="gov-btn gov-btn--secondary"
+              to={`/projects/${projectId}/work-packages/${packageId}/responses`}
+            >
+              Back to responses
+            </Link>
+            <Link
+              className="gov-btn gov-btn--primary"
+              to={`/projects/${projectId}/work-packages/${packageId}/evaluation/responses/${responseId ?? ""}`}
+            >
+              Evaluation
+            </Link>
+          </div>
         }
       />
 

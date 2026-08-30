@@ -3,6 +3,7 @@ import re
 import time
 
 from app.prompts.requirement_analysis import PROMPT_VERSION as REQ_PROMPT_VERSION
+from app.prompts.response_evaluation import PROMPT_VERSION as RESPONSE_PROMPT_VERSION
 from app.prompts.vendor_capability import PROMPT_VERSION as CAPABILITY_PROMPT_VERSION
 from app.prompts.work_package_decomposition import (
     PROMPT_VERSION as WP_PROMPT_VERSION,
@@ -12,6 +13,10 @@ from app.schemas import (
     CapabilityInsight,
     CapabilityInsightsRequest,
     CapabilityInsightsResponse,
+    EvaluationEvidence,
+    EvaluationInsight,
+    ResponseEvaluationRequest,
+    ResponseEvaluationResponse,
     RequirementAnalysisRequest,
     RequirementAnalysisResponse,
     RequirementCategory,
@@ -412,6 +417,121 @@ class StubProvider:
             prompt_version=CAPABILITY_PROMPT_VERSION,
         )
 
+
+    async def response_insights(
+        self, request: ResponseEvaluationRequest
+    ) -> ResponseEvaluationResponse:
+        """Section-presence reading of one submitted response.
+
+        Runs with no credentials, so it interprets nothing. What it does is
+        report which parts of the response carry content and which are silent,
+        quoting the opening of each section it found. That is a genuinely useful
+        thing for an official to see and — more importantly — it is true, which
+        a generated-sounding paragraph produced without a model would not be.
+
+        Like every other provider here it produces no score, no rank and no
+        recommendation.
+        """
+        start_time = time.time()
+
+        filled = [section for section in request.sections if section.content.strip()]
+        empty = [section for section in request.sections if not section.content.strip()]
+
+        strengths: list[EvaluationInsight] = []
+        weaknesses: list[EvaluationInsight] = []
+        attention: list[EvaluationInsight] = []
+        evidence: list[EvaluationEvidence] = []
+
+        for section in filled[:6]:
+            evidence.append(
+                EvaluationEvidence(
+                    section=section.label,
+                    quote=_first_sentence(section.content)[:400] or section.content[:400],
+                )
+            )
+
+        if filled:
+            strengths.append(
+                EvaluationInsight(
+                    title="Sections completed",
+                    detail=(
+                        "The response carries content in: "
+                        + ", ".join(section.label for section in filled)
+                        + "."
+                    ),
+                )
+            )
+
+        for section in empty:
+            weaknesses.append(
+                EvaluationInsight(
+                    title=f"{section.label} is empty",
+                    detail=(
+                        f"The {section.label.lower()} section of this response carries no text, "
+                        "so there is nothing on it to read."
+                    ),
+                )
+            )
+
+        unanswered = [
+            item for item in request.requirement_answers if not (item.answer or "").strip()
+        ]
+        if unanswered:
+            attention.append(
+                EvaluationInsight(
+                    title=f"{len(unanswered)} requirement(s) answered without a statement",
+                    detail=(
+                        "A stated position with no supporting statement cannot be verified. "
+                        "The first is: "
+                        + _first_sentence(unanswered[0].requirement)
+                    ),
+                )
+            )
+
+        not_applicable = [
+            item for item in request.requirement_answers if item.position == "NOT_APPLICABLE"
+        ]
+        if not_applicable:
+            attention.append(
+                EvaluationInsight(
+                    title=f"{len(not_applicable)} requirement(s) declared not applicable",
+                    detail=(
+                        "Whether these are accepted as outside the scope of this response is a "
+                        "decision for the department."
+                    ),
+                )
+            )
+
+        summary = (
+            f"{request.supplier_name} submitted a "
+            f"{request.response_type.replace('_', ' ').lower()} for {request.package_number} - "
+            f"{request.package_title}. It carries content in {len(filled)} of "
+            f"{len(request.sections)} section(s) and answers "
+            f"{len(request.requirement_answers)} requirement(s). "
+            "This reading is produced without a language model and reports only which parts of "
+            "the response carry content; it interprets none of them."
+        )
+
+        return ResponseEvaluationResponse(
+            summary=summary,
+            technical_fit=(
+                "No language model is configured, so the technical approach is not interpreted "
+                "here. It is reproduced in full on the response reader for the reviewing "
+                "official to read."
+            ),
+            experience_relevance=(
+                "No language model is configured, so the relevance of the experience described "
+                "is not assessed here."
+            ),
+            strengths=strengths,
+            weaknesses=weaknesses,
+            attention_points=attention,
+            evidence=evidence,
+            model="stub-deterministic-v1",
+            provider=self.name,
+            prompt_version=RESPONSE_PROMPT_VERSION,
+            response_time_ms=int((time.time() - start_time) * 1000),
+        )
 
 def _first_sentence(text: str) -> str:
     cleaned = " ".join(text.split())

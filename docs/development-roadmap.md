@@ -1,12 +1,11 @@
 # Development Roadmap
 
-**Status:** Milestones 0 through 6 are complete. Milestone 6 (Vendor
-Ecosystem) delivered vendor onboarding, profiles, verification, the vendor
-portal, opportunity-level matching, and — in its second half — work-package-
-level hybrid matching with deterministic eligibility, pgvector semantic
-retrieval, multi-factor ranking, explainable recommendations, side-by-side
-comparison, and a minimal shortlist seam. Milestones 7 onward are planned
-sequencing only.
+**Status:** Milestones 0 through 9 are complete. Milestone 6 delivered the
+vendor ecosystem and work-package-level hybrid matching; Milestone 7 the
+shortlist-to-invitation engagement step; Milestone 8 the collection of
+structured vendor responses; and Milestone 9 their evaluation, comparison and
+the recorded human procurement decision. Milestones 10 and 11 are planned
+sequencing only, and nothing from either has been built.
 
 ## Milestone 0 — Documentation Foundation (Complete)
 
@@ -471,42 +470,144 @@ to answer its own clarification, a resubmission with an outstanding question,
 a withdrawal after evaluation began, and an administrator attempting a
 procurement act).
 
-Not built, and deliberately left to Milestone 9: any assessment of a
-collected response. `READY_FOR_EVALUATION` records that a response is complete
-enough to be assessed; there is no score, no rank, no comparison and no
-recommendation anywhere in this milestone.
+No assessment of a collected response exists in this milestone.
+`READY_FOR_EVALUATION` records that a response is complete enough to be
+assessed; the assessment itself is Milestone 9, below.
 
-## Milestone 9 — Evaluation and AI-Assisted Decision Support (Planned, Not Detailed)
+## Milestone 9 — Evaluation and AI-Assisted Decision Support (Complete)
 
-Goal: turn the responses Milestone 8 collects into a comparable, explainable
-basis for a human decision. It starts from `READY_FOR_EVALUATION` and from the
-requirement-by-requirement answers, section values and attachments already
-stored — no new collection mechanism is needed.
+```
+READY_FOR_EVALUATION responses
+  -> configure evaluation criteria
+    -> AI analysis (advisory, optional, separate)
+    -> deterministic evaluation
+      -> explainable ranking
+        -> side-by-side comparison
+          -> human decision, with a mandatory reason
+```
 
-- Structured extraction of key information from vendor submissions
-  (document intelligence).
-- Requirement-by-requirement comparison across responding vendors;
-  compliance checking; missing-information detection.
-- Deterministic evaluation scoring wherever criteria are objective (budget,
-  timeline, stated compliance); AI-assisted analysis where judgment over
-  free text is required (technical fit, experience relevance) — same
-  deterministic/AI-assisted split already established for requirement and
-  work-package review.
-- Side-by-side comparison view with explainable rankings.
-- Three distinct, non-conflated layers, carried over from the matching
-  design: **AI analysis** identifies and summarizes evidence; **deterministic
-  evaluation** applies defined scoring criteria; **the human makes the final
-  procurement decision.** AI never independently determines eligibility or
-  overrides deterministic scoring — the same trust principle established for
-  matching in Milestone 6's second half.
+Goal, in full: turn the responses Milestone 8 collects into a structured,
+comparable and explainable basis for a government decision, while keeping the
+decision itself entirely human. It starts from `READY_FOR_EVALUATION` and from
+the requirement-by-requirement answers, section values and attachments already
+stored; no new collection mechanism was needed and no Milestone 8 table was
+changed.
 
-Delivers FR5, FR6, FR7, FR8, and FR9.2 (final decision recording).
+- [x] **Evaluation criteria per work package** (D86): eight criterion types —
+      price, delivery timeline, capacity, certifications and compliance,
+      relevant experience, technical response, requirement compliance, and a
+      departmental question — each weighted, some carrying a threshold (a
+      budget ceiling, a maximum duration, a minimum team size). Presets per
+      response type. One configuration per work package, never per supplier,
+      so the responses stay comparable.
+- [x] **Internal consistency enforced, not advised.** A criterion can only be
+      scored from information the department actually asked every supplier
+      for: configuring price on a package whose commercial section is switched
+      off is refused, as are weights that do not sum to 100, a criterion
+      configured twice, a departmental question belonging to another package's
+      form, a threshold on a criterion that takes none, and requirement
+      compliance on a package with no confirmed requirements. An inconsistent
+      set is still stored — so an official iterating on weights loses nothing —
+      but as `DRAFT`, with the problems attached, and a run refuses to apply
+      it. The check runs again immediately before every run.
+- [x] **Deterministic scoring** (`apps/api/src/evaluation/scoring.ts`,
+      `SCORING_VERSION = 1`): relative criteria scored against the best value
+      in the set (the lowest compliant quote scores 100, every other quote
+      `100 x lowest / this`), thresholds hard within their criterion, coverage
+      ratios for the rest. Every score carries the sentence explaining how it
+      was reached and the evidence lines it was read from. Reproducible by
+      construction: nothing reads the clock or a random source, and the set the
+      relative criteria were computed against is stored with the run.
+- [x] **Requirement-by-requirement comparison** with four verdicts —
+      compliant, partially compliant, non-compliant, insufficient information —
+      and the supplier's own stated position preserved beside each. **Missing
+      information is never compliance**: a supplier that ticked "meets" and
+      wrote nothing has stated a position, not evidenced one. "Did not answer"
+      and "answered that it cannot meet this" stay different facts.
+- [x] **Missing-information detection** across three sources shown as one
+      list: criteria whose data was absent, the Milestone 8 completeness check
+      (reused rather than recomputed, so the phrase means one thing across the
+      platform — D80), and every requirement that came out as insufficient.
+- [x] **AI-assisted analysis** through the existing AI service
+      (`POST /internal/v1/response-evaluation-insights`): a summary, a reading
+      of technical fit and experience relevance, strengths, weaknesses, points
+      requiring human attention, and the section and verbatim quote each
+      observation was drawn from. Advisory **structurally** (D89), not by
+      label: the schema has no score, rank, weight or recommendation field on
+      either side of the boundary, the analysis is stored in its own
+      append-only table with no score column, and nothing in
+      `apps/api/src/evaluation/` imports the AI client or reads that table.
+- [x] **Explainable ranking**: total score, criterion-level scores, strongest
+      and weakest factors, compliance gaps, missing information and supporting
+      evidence for every ranked response. Strongest and weakest are measured in
+      weighted contribution rather than raw score, because that is what
+      actually decided the order. Ties break deterministically, so two
+      responses never swap places between runs.
+- [x] **Side-by-side comparison** built from one stored run — so what is
+      compared is exactly what was calculated — covering eligibility (read from
+      the Milestone 6 matching run rather than re-derived), price, timeline,
+      capacity, certifications, public-sector delivery, requirement compliance,
+      each configured criterion with its weighted contribution, calculated
+      strengths and gaps, missing information, and the advisory reading in a
+      clearly marked row.
+- [x] **The human decision** (D90): an official selects or rejects a named
+      response with a mandatory reason. Recorded with the acting user, the
+      moment, the vendor, the work package, the evaluation run they were
+      looking at, and the rank and total that response held in it — read
+      server-side from the stored run, never from the request. At most one live
+      selection per work package, enforced by a partial unique index. Nothing
+      computes a decision, and an integration test asserts that running an
+      evaluation adds none.
+- [x] **Immutable decisions with revocation**: correcting a decision leaves the
+      original row and its reason on the record and adds a revocation with its
+      own mandatory reason, plus a new decision. An `UPDATE` would erase what
+      the department first decided.
+- [x] **Snapshots** (D87): every run stores the criteria it applied, what was
+      asked of suppliers at the time, the scoring and criteria versions, and
+      one result row per response — including those it could not assess and
+      why. Runs accumulate and are never overwritten, so changing the criteria
+      afterwards cannot alter a score a decision already cites.
+- [x] **Audit** in `work_package_history` (D73), extended with
+      `EVALUATION_CONFIGURED`, `EVALUATION_RUN`, `EVALUATION_AI_ANALYSIS`,
+      `VENDOR_SELECTED`, `VENDOR_REJECTED` and `DECISION_REVOKED`. The run
+      entry carries the ranking that was shown; the decision entry carries the
+      official's reason.
+- [x] **Government evaluation workspace** at
+      `projects/:id/work-packages/:workPackageId/evaluation`, arranged in the
+      order the work is done and labelled for an official with no technical
+      background: what is being scored on, which responses can be scored, the
+      ranking and its reasons, the side-by-side comparison, the
+      requirement-by-requirement grid, and the decision. A per-response page
+      decomposes the score criterion by criterion with the basis and evidence
+      for each, and carries the advisory reading in its own card under its own
+      warning.
+- [x] **Permissions** (D91): `evaluation:configure`, `evaluation:manage` and
+      `evaluation:decide` for `GOVERNMENT_OFFICIAL` only; `evaluation:read` for
+      `GOVERNMENT_OFFICIAL` and `ADMIN`. No vendor role holds any of the four,
+      so a supplier reaches no evaluation route at all.
+
+Migration `010_evaluation.sql`. Delivers FR5, FR6, FR7, FR8 and FR9.2 (final
+decision recording), and extends FR11.1.
+
+Verified by `apps/api/tests/evaluation.unit.test.ts` (39 tests over the
+criterion catalogue, the consistency rules, the compliance derivation, the
+threshold extraction, the scoring formulas, weighting, reproducibility and the
+ranking) and `apps/api/tests/evaluation.integration.test.ts` (48 tests over
+HTTP covering the whole flow and, mostly, the requests that must be refused: a
+supplier on every evaluation route, an administrator attempting to configure,
+run or decide, another department, an unauthenticated caller, an inconsistent
+criteria set, a departmental question from another package's form, a run id
+from another package, a response id from another package, a decision with no
+reason, a second selection, a second decision on one response, a revocation
+without a reason, and a repeat revocation). The suite also asserts that AI
+analysis changes no score, that a supplier's own view of its response leaks no
+evaluation field, and that Milestones 6, 7 and 8 still behave as before.
 
 ## Milestone 10 — Procurement Intelligence and Analytics (Planned, Not Detailed)
 
-Goal: surface patterns across procurement activity once enough of it has
-happened to be worth analyzing. Explicitly a later product-intelligence
-phase, not a near-term priority.
+**Not implemented.** Goal: surface patterns across procurement activity once
+enough of it has happened to be worth analyzing. Explicitly a later
+product-intelligence phase, not a near-term priority.
 
 - **Vendor gap analysis**, arising directly from Milestone 6's matching
   work: detect when a work package has no or very few eligible vendors,
@@ -521,8 +622,10 @@ phase, not a near-term priority.
 
 ## Milestone 11 — Advanced Semantic Optimization (Planned, Not Detailed)
 
-Goal: improve matching quality after a reliable hybrid baseline (Milestone
-6's second half) is in production, not before.
+**Not implemented.** Goal: improve matching quality after a reliable hybrid
+baseline (Milestone 6's second half) is in production, not before. Milestone 9
+records human selections and rejections but deliberately learns nothing from
+them: that feedback loop is this milestone's, not that one's.
 
 - Domain-specific embeddings, procurement vocabulary normalization,
   synonym expansion, industry taxonomies.
@@ -551,11 +654,24 @@ cd apps/api && npm install && npm run migrate && npm run seed && npm run dev
 cd apps/web && npm install && npm run dev
 ```
 
-`npm run seed` provisions demo accounts across all three roles and a set of
-seeded suppliers spanning multiple industries with published procurement
+`npm run seed` provisions demo accounts across all three roles and a
+registry of 58 fully onboarded, administrator-verified suppliers spanning the
+sectors a department actually buys from, with published procurement
 opportunities to match against — see
 [product/users-and-roles.md](product/users-and-roles.md) for the account
 list.
+
+Two supplier-only commands exist alongside it. `npm run check:vendors`
+validates the catalogue against the onboarding schema and the API's own patch
+schema without touching a database, and `npm run seed:vendors` writes only
+supplier rows, leaving projects, work packages, invitations, responses and
+evaluations alone. `npx tsx scripts/verifyVendorRegistry.ts` reads the
+database back and fails if any supplier is short of complete, documented and
+verified.
+
+The first matching run after a reseed generates an embedding for every
+supplier and therefore takes a couple of minutes; subsequent runs read the
+stored vectors and complete in seconds (D67).
 
 ## Notes
 

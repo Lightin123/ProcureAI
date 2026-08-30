@@ -25,8 +25,17 @@ Responsibilities:
   shortlist them against a specific work package with a recorded reason.
 - Invite shortlisted suppliers to respond, and track who accepted, who
   declined and why.
-- Review evaluations, rankings, and explanations.
-- Make and record the final procurement decision.
+- Configure what a response must contain, and move a submitted response
+  through review to `READY_FOR_EVALUATION`.
+- Configure the weighted evaluation criteria a work package is judged on, and
+  run the evaluation.
+- Review evaluations, rankings and explanations; compare suppliers side by side
+  and requirement by requirement; optionally ask for an advisory AI reading of
+  a response.
+- **Make and record the final procurement decision** — select or reject a named
+  supplier with a mandatory reason. This is the only act in the system that
+  chooses a supplier, and no other role and no automated process can perform
+  it.
 
 Permissions: full read/write on procurement projects **within their own
 organization**, including running AI analysis and performing workflow
@@ -40,19 +49,23 @@ Administrator" and "Procurement Administrator" (D46).
 
 Responsibilities:
 - View procurement projects across officials in their department.
-- Oversight and audit of procurement activity.
+- Oversight and audit of procurement activity, including collected responses,
+  evaluation criteria, calculated scores, rankings and recorded decisions.
 - User administration within their department (no endpoint yet — see U30).
 
 Permissions: **read-only across their organization.** An administrator is
 deliberately *not* able to create projects, run analysis, decide on
-requirements, answer clarifications, or transition a workflow stage (D48).
+requirements, answer clarifications, transition a workflow stage (D48),
+configure or run an evaluation, or record a procurement decision (D91).
 
 > **Why administrators cannot act on a project.** A procurement decision must
 > be attributable to the government official who made it (FR11.1, Workflow
 > Principle 6). An oversight role able to quietly confirm another official's
 > requirements would defeat both the audit trail and the accountability model.
 > The accepted cost is that an administrator cannot unblock a project on an
-> absent official's behalf.
+> absent official's behalf. Milestone 9 applies the same rule at the point it
+> matters most: oversight may read an evaluation and the decision taken from
+> it, and may configure neither, run neither, nor record either.
 
 ### Vendor Representative — `VENDOR`
 
@@ -135,6 +148,10 @@ authoritative mapping. This table mirrors that file.
 | `response:configure` | Yes | — | — |
 | `response:read` | Yes | Yes | — |
 | `response:manage` | Yes | — | — |
+| `evaluation:configure` | Yes | — | — |
+| `evaluation:read` | Yes | Yes | — |
+| `evaluation:manage` | Yes | — | — |
+| `evaluation:decide` | Yes | — | — |
 | `vendor:response:read` | — | — | Yes |
 | `vendor:response:submit` | — | — | Yes |
 
@@ -190,10 +207,31 @@ rather than dropped.
 
 `npm run seed` provisions, for development and demonstration only: three
 government accounts across two departments (two officials, one
-administrator), and a set of vendor accounts spanning multiple industries
-— manufacturing, agriculture, construction, healthcare, skilling,
-sustainability — at varying onboarding-completion and verification states,
-alongside published procurement opportunities for them to match against.
+administrator), and **58 supplier accounts** spanning the sectors an Indian
+department actually buys from — manufacturing and industrial production,
+agriculture and food supply, cold chain and warehousing, construction, roads
+and water infrastructure, renewable energy, waste and environmental services,
+healthcare, education and skilling, logistics, research and testing,
+professional services, software and security — alongside published
+procurement opportunities for them to match against.
+
+Every supplier account is registered against its own vendor organisation,
+onboarded to 100% completion, carries offerings, past projects, credentials
+and verified compliance documents, and is administrator-approved. What varies
+between them is their actual capability, coverage, capacity and credentials,
+not the completeness of their profile: a supplier the eligibility gate
+excludes from a work package is excluded on the merits. The catalogue lives in
+`apps/api/src/config/vendors/` and records against each supplier, in
+`matchingRole`, what it is expected to demonstrate.
+
+`npm run seed:vendors` refreshes only the supplier registry, leaving
+procurement projects, work packages, invitations, responses and evaluations
+untouched. `npm run check:vendors` validates the catalogue without a database.
+
+All supplier data is fictional. No real organisation, individual,
+registration number, certificate or contract is represented, and the
+compliance documents the seeder generates say so on their face.
+
 Credential handling and the reset procedure are covered in
 [../engineering/security.md](../engineering/security.md).
 

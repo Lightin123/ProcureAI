@@ -32,7 +32,8 @@ import { ResponseConfigPanel } from "../components/ResponseConfigPanel.js";
  * is long and comparing statuses is the thing this page is for.
  *
  * Nothing here scores, ranks or recommends a supplier. Collecting and tracking
- * responses is Milestone 8; evaluating them is Milestone 9.
+ * responses is Milestone 8; scoring, comparing and deciding between them is the
+ * evaluation workspace, one click away.
  */
 
 export function formatMoment(value: string | null): string {
@@ -166,15 +167,26 @@ export function WorkPackageResponsesPage() {
             : `${view.workPackage.packageNumber} — ${view.workPackage.title}`
         }
         action={
-          <button
-            type="button"
-            className="gov-btn gov-btn--secondary"
-            onClick={() =>
-              void navigate(`/projects/${projectId}/work-packages/${packageId}/suppliers`)
-            }
-          >
-            Back to supplier matching
-          </button>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="gov-btn gov-btn--secondary"
+              onClick={() =>
+                void navigate(`/projects/${projectId}/work-packages/${packageId}/suppliers`)
+              }
+            >
+              Back to supplier matching
+            </button>
+            <button
+              type="button"
+              className="gov-btn gov-btn--primary"
+              onClick={() =>
+                void navigate(`/projects/${projectId}/work-packages/${packageId}/evaluation`)
+              }
+            >
+              Evaluate responses
+            </button>
+          </div>
         }
       />
 

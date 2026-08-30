@@ -52,23 +52,38 @@ Milestones 1 through 8 — see
   Submission is validated server-side against the department's own
   configuration and the response becomes immutable. Either side can raise a
   clarification; the official moves the submission through review to *ready
-  for evaluation*, which is where Milestone 9 begins.
+  for evaluation*.
+- **Milestone 9** — evaluation and AI-assisted decision support: the official
+  configures the weighted criteria a work package is judged on — price,
+  timeline, capacity, certifications, experience, technical response,
+  requirement compliance, and the department's own questions — with the system
+  refusing a set that does not add up or that scores suppliers on information
+  nobody was asked for. Running the evaluation scores every ready response by
+  arithmetic over the figures suppliers stated, compares them requirement by
+  requirement without ever counting silence as compliance, and produces a
+  ranking in which every position shows the factors that produced it. The
+  official compares suppliers side by side, may ask for an advisory AI reading
+  of any response — clearly labelled, quoting the passages it drew on, and
+  incapable of moving a score — and then selects or rejects a named supplier
+  with a mandatory reason. The decision, its reason, its author, its moment and
+  the evaluation it cites are recorded, and every earlier evaluation stays on
+  the record unchanged.
 
 All three services (`apps/web`, `apps/api`, `apps/ai-service`) run together.
 
 ## Current Development Stage
 
-Milestones 1 through 8 are complete. The next milestone is **Milestone 9 —
-evaluation and AI-assisted decision support**: turning the collected responses
-into a comparable, explainable basis for a human decision. See
+Milestones 1 through 9 are complete. The next milestones are **Milestone 10 —
+procurement intelligence and analytics** and **Milestone 11 — advanced semantic
+optimization**, neither of which is started. See
 [../development-roadmap.md](../development-roadmap.md).
 
-Nothing in Milestone 8 anticipates that schema. `READY_FOR_EVALUATION` records
-that a response is complete enough to be assessed and no more; no score, rank
-or comparison exists, and the evaluation entity is deliberately unmodelled
-until the workflow that uses it is specified — the same reasoning that kept
-the shortlist minimal in Milestone 6 (D69) and the response unmodelled through
-Milestone 7.
+The core system flow is now complete end to end: a problem description becomes
+requirements, requirements become work packages, work packages find suppliers,
+suppliers are invited and respond, responses are evaluated, and an official
+records a decision. What Milestones 10 and 11 add is intelligence *across*
+procurements — patterns, gaps, analytics, learning — rather than any further
+step within one.
 
 The roadmap was re-sequenced twice from the original problem-statement
 ordering: authentication and RBAC (Milestone 5) were moved ahead of vendor
@@ -76,20 +91,23 @@ work (D43), and within Milestone 6, vendor onboarding was built before
 work-package-level matching, for the same reason — matching needs vendors
 and work packages to exist first. Milestones 7 and 8 followed the same
 dependency chain: an invitation needs a shortlist, a shortlist needs a
-ranking, and a response needs an accepted invitation.
+ranking, a response needs an accepted invitation, and an evaluation needs a
+submitted response.
 
 ## Explicitly Out of Scope for the Current Stage
 
 Per project instructions, the following must **not** be implemented until
 explicitly requested:
 
-- RFI/proposal collection from vendors (Milestone 8) — including the
-  response form, deadline configuration, submission tracking and
-  clarification requests. Milestone 7 stops at the accepted invitation.
-- Document intelligence and vendor response evaluation (Milestone 9).
-- Vendor gap analysis and procurement analytics (Milestone 10).
-- Advanced semantic optimization — learned ranking, query expansion,
-  reranking models (Milestone 11).
+- **Document intelligence** — parsing or extracting structure from the
+  *contents* of an uploaded attachment. Milestone 9 reads the structured fields
+  and written answers a supplier submitted, and passes attachment titles only
+  to the AI service.
+- Vendor gap analysis, procurement analytics and organization-wide
+  intelligence dashboards (Milestone 10).
+- Advanced semantic optimization — learned ranking, query expansion, reranking
+  models — learning from recorded human decisions, model fine-tuning, and
+  automatic allocation of vendors across several work packages (Milestone 11).
 - Docker, CI/CD pipelines, deployment configuration.
 
 ## Likely Hackathon-Demo Scope (Not Yet Confirmed)

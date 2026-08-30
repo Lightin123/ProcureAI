@@ -1,7 +1,13 @@
 # Document Intelligence
 
 **Status:** Planned / future idea. Not implemented, not yet designed in
-detail.
+detail. Milestone 9 evaluates responses **without** it, and the gap is worth
+being precise about: the response form collects the quoted value, the duration,
+the committed team size, the compliance confirmation and a written answer per
+requirement as structured fields, and the evaluation reads those. What it does
+not read is the inside of an uploaded attachment. Attachment **titles** are
+passed to the AI service, which is explicitly told the contents were not
+supplied and must not be assumed.
 
 ## Purpose
 
@@ -10,7 +16,10 @@ the RFI/proposal collection step (FR5/FR6 in
 [../product/requirements.md](../product/requirements.md)), so that the
 extracted data can feed into evaluation (see
 [evaluation-and-ranking.md](evaluation-and-ranking.md)) without requiring an
-official to manually re-key document contents.
+official to manually re-key document contents. Since Milestone 9 collects the
+evaluation-relevant fields on the form itself, this is now an enhancement —
+corroborating or enriching what a supplier typed — rather than the only route
+to an evaluable submission.
 
 ## Envisioned Capabilities (Not Yet Designed)
 

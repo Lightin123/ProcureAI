@@ -1,7 +1,8 @@
 # AI System Overview
 
 **Status:** Partially implemented. Requirement extraction (Milestone 3),
-work-package decomposition (Milestone 4), and vendor capability-insight
+work-package decomposition (Milestone 4), vendor response reading
+(Milestone 9), and vendor capability-insight
 generation (Milestone 6) are implemented, each behind the same three-
 provider selection described below. Semantic vendor matching, document
 information extraction, proposal analysis, and candidate comparison remain
@@ -31,7 +32,21 @@ vendor's capability document and returns a positioning summary, strengths,
 gaps, and suggested opportunity areas — advisory only; nothing in vendor
 matching, verification, or eligibility reads this output back.
 
-All three endpoints are implemented behind the same three providers:
+`POST /internal/v1/response-evaluation-insights` (Milestone 9) takes one
+submitted vendor response and returns a summary, a reading of technical fit and
+experience relevance, strengths, weaknesses, points requiring human attention,
+and the section and verbatim quote each observation was drawn from. Advisory
+**structurally**, not by label (D89): the request and response schemas carry no
+score, rank, weight or recommendation field, the result is stored in its own
+append-only table with no score column, and nothing in the deterministic
+evaluation pipeline imports the AI client or reads that table. This is also the
+first endpoint whose input is written by somebody with an interest in how it is
+assessed, so the prompt instructs the model to ignore any instruction inside
+the response and to record the attempt as a point for human attention — and the
+structural separation means a successful injection can mislead one advisory
+paragraph without moving a score, a rank or a decision.
+
+All four endpoints are implemented behind the same three providers:
 
 - **`anthropic`** — calls Claude through the official `anthropic` Python SDK
   using structured outputs, so the response is schema-constrained rather than
@@ -92,12 +107,18 @@ AI capabilities, implemented vs. planned:
 - Work-package generation — implemented (Milestone 4)
 - Vendor capability positioning/gap insight — implemented (Milestone 6),
   advisory only
-- Semantic vendor discovery (embeddings via pgvector) — **planned, current
-  priority** — see [rag-and-semantic-search.md](rag-and-semantic-search.md)
-- Document information extraction — planned (Milestone 8)
-- Proposal analysis — planned (Milestone 9)
-- Technical capability analysis, candidate comparison, recommendation
-  explanation — planned (Milestone 6 next phase and Milestone 9)
+- Semantic vendor discovery (embeddings via pgvector) — implemented
+  (Milestone 6, part 2) — see
+  [rag-and-semantic-search.md](rag-and-semantic-search.md)
+- Candidate comparison and recommendation explanation for **suppliers** —
+  implemented (Milestone 6, part 2), with no model involved at all: the
+  explanations are assembled from stored values and quoted with them
+- Proposal analysis — implemented (Milestone 9), advisory only
+- Response evaluation, comparison and ranking — implemented (Milestone 9) and
+  **fully deterministic**; the AI reading sits beside the numbers, never inside
+  them
+- Document information extraction from attachment *contents* — planned, not
+  started; see [document-intelligence.md](document-intelligence.md)
 
 Each capability corresponds to a specific step in
 [../design/procurement-workflow.md](../design/procurement-workflow.md), not

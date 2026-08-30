@@ -36,8 +36,21 @@ export interface EmbeddingBatch {
  */
 export const EMBEDDING_DIMENSIONS = 384;
 
-/** The AI service caps a batch at 64 texts. */
-const MAX_BATCH = 64;
+/**
+ * Texts per request.
+ *
+ * The AI service accepts up to 64, but the batch size that matters here is the
+ * one that keeps a single request inside `AI_SERVICE_TIMEOUT_MS`. The default
+ * encoder runs on CPU at roughly two seconds per capability document, so a
+ * batch of 64 takes about two minutes and aborts against a sixty-second
+ * timeout — and because a failed batch returns nothing, the whole registry then
+ * has no embeddings and matching silently degrades to lexical-only (D64).
+ *
+ * Sixteen keeps a request near thirty seconds on the same hardware, which
+ * leaves headroom on a slower machine and turns a re-embed of the whole
+ * registry into several short requests rather than one that cannot finish.
+ */
+const MAX_BATCH = 16;
 
 export async function requestEmbeddings(
   texts: readonly string[],

@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:vendors": "tsx scripts/seedVendors.ts",
+    "check:vendors": "tsx scripts/checkVendorCatalogue.ts",
     "test": "tsx --test tests/*.unit.test.ts",
     "test:integration": "tsx --test --test-concurrency=1 tests/*.integration.test.ts"
   },

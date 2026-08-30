@@ -4,8 +4,6 @@ import { Link } from "react-router-dom";
 import { ApiRequestError } from "../api/client.js";
 import {
   fetchDashboard,
-  markNotificationRead,
-  markNotificationsRead,
   requestCapabilityInsights,
   type CapabilityInsights,
   type VendorDashboard,
@@ -94,21 +92,6 @@ export function VendorDashboardPage() {
     }
   }
 
-  async function dismissNotifications() {
-    await markNotificationsRead();
-    await load();
-  }
-
-  /** Opening a notification is what marks that one read. */
-  async function openNotification(notificationId: string, unread: boolean) {
-    if (!unread) return;
-    try {
-      await markNotificationRead(notificationId);
-      await load();
-    } catch {
-      // Following the link matters more than recording that it was followed.
-    }
-  }
 
   if (state.kind === "loading") {
     return (
@@ -544,50 +527,7 @@ export function VendorDashboardPage() {
             )}
           </GovernmentCard>
 
-          <GovernmentCard
-            title="Notifications"
-            action={
-              counts.unreadNotifications > 0 && (
-                <button
-                  type="button"
-                  className="gov-btn gov-btn--tertiary gov-btn--sm"
-                  onClick={() => void dismissNotifications()}
-                >
-                  Mark all read
-                </button>
-              )
-            }
-          >
-            {dashboard.notifications.length === 0 ? (
-              <p>No notifications.</p>
-            ) : (
-              <ul className="gov-notification-list">
-                {dashboard.notifications.map((notification) => (
-                  <li
-                    key={notification.id}
-                    className={`gov-notification${notification.readAt === null ? " gov-notification--unread" : ""}`}
-                  >
-                    <div className="gov-notification__head">
-                      <strong>{notification.title}</strong>
-                      <span>{formatDate(notification.createdAt)}</span>
-                    </div>
-                    <p>{notification.body}</p>
-                    {notification.linkPath !== null && (
-                      <Link
-                        className="gov-link-button"
-                        to={notification.linkPath}
-                        onClick={() =>
-                          void openNotification(notification.id, notification.readAt === null)
-                        }
-                      >
-                        Open
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </GovernmentCard>
+
         </aside>
       </div>
     </>

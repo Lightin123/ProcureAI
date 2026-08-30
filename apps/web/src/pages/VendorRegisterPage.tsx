@@ -6,7 +6,8 @@ import { ApiRequestError } from "../api/client.js";
 import { permissionChecker, useAuth } from "../auth/AuthContext.js";
 import { landingPathFor } from "../auth/routeAccess.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
-import { CheckCircleIcon, EmblemIcon } from "../components/GovernmentIcons.js";
+import { PasswordInput } from "../components/PasswordInput.js";
+import { CheckCircleIcon, EmblemIcon, IndiaFlagIcon } from "../components/GovernmentIcons.js";
 import { SessionCheck } from "../components/SessionCheck.js";
 
 const MINIMUM_PASSWORD_LENGTH = 12;
@@ -99,11 +100,7 @@ export function VendorRegisterPage() {
       <div className="gov-top-bar">
         <div className="portal-container gov-top-bar__inner">
           <div className="gov-top-bar__left">
-            <div className="gov-top-bar__flag-strip" aria-label="Indian Tricolor Strip">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            <IndiaFlagIcon width={22} height={15} />
             <span className="gov-top-bar__title">भारत सरकार | Government of India</span>
           </div>
           <div className="gov-top-bar__right">
@@ -255,10 +252,9 @@ export function VendorRegisterPage() {
                     At least {MINIMUM_PASSWORD_LENGTH} characters. Use a phrase you will remember —
                     there is no self-service password reset yet.
                   </p>
-                  <input
+                  <PasswordInput
                     id="register-password"
-                    className={`gov-form-control${fieldErrors.password ? " gov-form-control--error" : ""}`}
-                    type="password"
+                    error={!!fieldErrors.password}
                     autoComplete="new-password"
                     value={password}
                     aria-describedby="register-password-hint"
@@ -271,10 +267,9 @@ export function VendorRegisterPage() {
                   <label className="gov-form-label" htmlFor="register-confirm">
                     Confirm password<span className="gov-form-required">*</span>
                   </label>
-                  <input
+                  <PasswordInput
                     id="register-confirm"
-                    className={`gov-form-control${!passwordsMatch || fieldErrors.confirmPassword ? " gov-form-control--error" : ""}`}
-                    type="password"
+                    error={!passwordsMatch || !!fieldErrors.confirmPassword}
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}

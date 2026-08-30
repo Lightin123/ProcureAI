@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#0B4F8C"/>
+  <rect x="6" y="8" width="52" height="14" fill="#FF9933" rx="2"/>
+  <rect x="6" y="22" width="52" height="14" fill="#FFFFFF"/>
+  <rect x="6" y="36" width="52" height="14" fill="#138808" rx="2"/>
+  <!-- Ashoka Chakra -->
+  <circle cx="32" cy="29" r="6" fill="none" stroke="#000080" stroke-width="1"/>
+  <circle cx="32" cy="29" r="1.2" fill="#000080"/>
+  <line x1="32" y1="23" x2="32" y2="35" stroke="#000080" stroke-width="0.6"/>
+  <line x1="26" y1="29" x2="38" y2="29" stroke="#000080" stroke-width="0.6"/>
+  <line x1="27.8" y1="24.8" x2="36.2" y2="33.2" stroke="#000080" stroke-width="0.6"/>
+  <line x1="27.8" y1="33.2" x2="36.2" y2="24.8" stroke="#000080" stroke-width="0.6"/>
+  <!-- Base text -->
+  <text x="32" y="57" fill="#FFFFFF" font-size="7" font-weight="bold" font-family="'Noto Sans', sans-serif" text-anchor="middle" letter-spacing="1">INDIA</text>
+</svg>

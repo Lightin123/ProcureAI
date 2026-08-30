@@ -5,6 +5,8 @@ import { ROUTE_PERMISSION, landingPathFor } from "./auth/routeAccess.js";
 import { PortalLayout } from "./components/PortalLayout.js";
 import { RequireAuth } from "./components/RequireAuth.js";
 import { RequirePermission } from "./components/RequirePermission.js";
+import { ScrollToTop } from "./components/ScrollToTop.js";
+import { BackToTopButton } from "./components/BackToTopButton.js";
 import { AdminSupplierDetailPage } from "./pages/AdminSupplierDetailPage.js";
 import { AdminSupplierRegistryPage } from "./pages/AdminSupplierRegistryPage.js";
 import { EvaluationResponseDetailPage } from "./pages/EvaluationResponseDetailPage.js";
@@ -48,8 +50,11 @@ function LandingRedirect() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <>
+      <ScrollToTop />
+      <BackToTopButton />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<VendorRegisterPage />} />
 
       <Route element={<RequireAuth />}>
@@ -124,5 +129,6 @@ export function App() {
         </Route>
       </Route>
     </Routes>
+    </>
   );
 }

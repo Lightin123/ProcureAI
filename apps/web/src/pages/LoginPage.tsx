@@ -6,7 +6,8 @@ import { ApiRequestError } from "../api/client.js";
 import { permissionChecker, useAuth } from "../auth/AuthContext.js";
 import { canAccessPath, landingPathFor } from "../auth/routeAccess.js";
 import { GovernmentAlert } from "../components/GovernmentAlert.js";
-import { EmblemIcon, CheckCircleIcon } from "../components/GovernmentIcons.js";
+import { PasswordInput } from "../components/PasswordInput.js";
+import { EmblemIcon, CheckCircleIcon, IndiaFlagIcon } from "../components/GovernmentIcons.js";
 import { SessionCheck } from "../components/SessionCheck.js";
 
 const DEMO_ACCOUNTS = [
@@ -100,11 +101,7 @@ export function LoginPage() {
       <div className="gov-top-bar">
         <div className="portal-container gov-top-bar__inner">
           <div className="gov-top-bar__left">
-            <div className="gov-top-bar__flag-strip" aria-label="Indian Tricolor Strip">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            <IndiaFlagIcon width={22} height={15} />
             <span className="gov-top-bar__title">भारत सरकार | Government of India</span>
           </div>
           <div className="gov-top-bar__right">
@@ -199,10 +196,9 @@ export function LoginPage() {
                     Password
                     <span className="gov-form-required">*</span>
                   </label>
-                  <input
+                  <PasswordInput
                     id="login-password"
-                    className={`gov-form-control${fieldErrors.password ? " gov-form-control--error" : ""}`}
-                    type="password"
+                    error={!!fieldErrors.password}
                     name="password"
                     autoComplete="current-password"
                     required

@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext.js";
 import { NAV_ITEMS, ROUTE_PERMISSION, landingPathFor } from "../auth/routeAccess.js";
-import { EmblemIcon } from "./GovernmentIcons.js";
+import { EmblemIcon, IndiaFlagIcon } from "./GovernmentIcons.js";
 import { NotificationBell } from "./NotificationBell.js";
 
 function initialsOf(fullName: string): string {
@@ -39,11 +39,7 @@ export function GovernmentHeader() {
       <div className="gov-top-bar">
         <div className="portal-container gov-top-bar__inner">
           <div className="gov-top-bar__left">
-            <div className="gov-top-bar__flag-strip" aria-label="Indian Tricolor Strip">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            <IndiaFlagIcon width={22} height={15} />
             <span className="gov-top-bar__title">
               भारत सरकार | Government of India
             </span>

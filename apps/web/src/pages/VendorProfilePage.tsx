@@ -76,6 +76,7 @@ function renderValue(field: OnboardingField, value: unknown): React.ReactNode {
 export function VendorProfilePage() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [showDocument, setShowDocument] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     document.title = "Capability Profile · ProcureAI";
@@ -152,7 +153,10 @@ export function VendorProfilePage() {
 
       <div className="gov-two-column">
         <div className="gov-two-column__main">
-          {schema.steps.map((step) => {
+          {(() => {
+            const step = schema.steps[currentPage - 1];
+            if (!step) return null;
+
             const groups = visibleGroups(step, values).map((group) => ({
               ...group,
               fields: group.fields.filter((field) =>
@@ -162,7 +166,23 @@ export function VendorProfilePage() {
             const answeredGroups = groups.filter((group) => group.fields.length > 0);
 
             const hasCollections = (step.collections ?? []).length > 0;
-            if (answeredGroups.length === 0 && !hasCollections) return null;
+            if (answeredGroups.length === 0 && !hasCollections) {
+               return (
+                 <GovernmentCard
+                   title={step.title}
+                   action={
+                     <Link
+                       className="gov-btn gov-btn--tertiary gov-btn--sm"
+                       to={`/vendor/onboarding?step=${step.id}`}
+                     >
+                       Edit
+                     </Link>
+                   }
+                 >
+                   <p className="gov-collection__empty">Nothing recorded in this section yet.</p>
+                 </GovernmentCard>
+               );
+            }
 
             return (
               <GovernmentCard
@@ -303,7 +323,41 @@ export function VendorProfilePage() {
                 )}
               </GovernmentCard>
             );
-          })}
+          })()}
+
+          {schema.steps.length > 1 && (
+            <div className="gov-pagination" style={{ justifyContent: "center" }}>
+              <div className="gov-pagination__controls">
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--secondary gov-btn--sm"
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.max(1, prev - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Previous
+                </button>
+
+                <div className="gov-pagination__options" style={{ padding: "0 12px" }}>
+                  Page {currentPage} of {schema.steps.length}
+                </div>
+
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--secondary gov-btn--sm"
+                  disabled={currentPage === schema.steps.length}
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.min(schema.steps.length, prev + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
 
           <GovernmentCard
             title="Capability Statement Used for Matching"

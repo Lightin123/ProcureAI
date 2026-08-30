@@ -1,29 +1,100 @@
 import React from "react";
 
-export function EmblemIcon({ size = 32 }: { size?: number }) {
+export function IndiaFlagIcon({
+  width = 24,
+  height = 16,
+  className,
+  title = "Government of India Flag",
+}: {
+  width?: number;
+  height?: number;
+  className?: string;
+  title?: string;
+}) {
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox="0 0 48 48"
-      fill="none"
+      width={width}
+      height={height}
+      viewBox="0 0 300 200"
       xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
+      role="img"
+      aria-label={title}
+      className={className}
+      style={{
+        display: "inline-block",
+        verticalAlign: "middle",
+        borderRadius: "1px",
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+        flexShrink: 0,
+      }}
     >
-      <circle cx="24" cy="24" r="21" stroke="currentColor" strokeWidth="2.5" />
-      <circle cx="24" cy="24" r="7" stroke="currentColor" strokeWidth="2" />
-      {/* 24 spokes representation */}
-      <line x1="24" y1="4" x2="24" y2="44" stroke="currentColor" strokeWidth="1.5" />
-      <line x1="4" y1="24" x2="44" y2="24" stroke="currentColor" strokeWidth="1.5" />
-      <line x1="9.86" y1="9.86" x2="38.14" y2="38.14" stroke="currentColor" strokeWidth="1.5" />
-      <line x1="9.86" y1="38.14" x2="38.14" y2="9.86" stroke="currentColor" strokeWidth="1.5" />
-      <line x1="16.34" y1="6.08" x2="31.66" y2="41.92" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="6.08" y1="16.34" x2="41.92" y2="31.66" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="31.66" y1="6.08" x2="16.34" y2="41.92" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="41.92" y1="16.34" x2="6.08" y2="31.66" stroke="currentColor" strokeWidth="1.2" />
+      <title>{title}</title>
+      {/* Top Saffron Band */}
+      <rect width="300" height="66.67" fill="#FF9933" />
+      {/* Middle White Band */}
+      <rect y="66.67" width="300" height="66.67" fill="#FFFFFF" />
+      {/* Bottom India Green Band */}
+      <rect y="133.33" width="300" height="66.67" fill="#138808" />
+
+      {/* Ashoka Chakra in Navy Blue (#000080) */}
+      <g transform="translate(150, 100)">
+        {/* Outer Ring */}
+        <circle r="25.5" fill="none" stroke="#000080" strokeWidth="2.8" />
+        {/* Center Hub */}
+        <circle r="5" fill="#000080" />
+        <circle r="2" fill="#FFFFFF" />
+
+        {/* 24 Radial Spokes */}
+        {[
+          0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165,
+          180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345,
+        ].map((angle) => (
+          <g key={angle} transform={`rotate(${angle})`}>
+            <line x1="0" y1="4.5" x2="0" y2="24" stroke="#000080" strokeWidth="1.2" />
+            <polygon points="-1.2,23.8 0,25.2 1.2,23.8" fill="#000080" />
+          </g>
+        ))}
+      </g>
     </svg>
   );
 }
+
+export const IndianFlagIcon = IndiaFlagIcon;
+
+export function LionEmblemIcon({
+  size = 36,
+  className,
+  style,
+  title = "State Emblem of India",
+}: {
+  size?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  title?: string;
+}) {
+  return (
+    <img
+      src="/Emblem.png"
+      alt={title}
+      title={title}
+      className={className}
+      style={{
+        height: `${size}px`,
+        width: "auto",
+        maxHeight: `${Math.round(size * 1.35)}px`,
+        objectFit: "contain",
+        display: "inline-block",
+        verticalAlign: "middle",
+        flexShrink: 0,
+        ...style,
+      }}
+      loading="eager"
+    />
+  );
+}
+
+export const EmblemIcon = LionEmblemIcon;
+
 
 export function SearchIcon({ size = 16 }: { size?: number }) {
   return (
@@ -621,3 +692,64 @@ export function MailIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+export function EyeIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+      <line x1="2" y1="2" x2="22" y2="22"></line>
+    </svg>
+  );
+}
+
+export function ArrowUpIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="19" x2="12" y2="5"></line>
+      <polyline points="5 12 12 5 19 12"></polyline>
+    </svg>
+  );
+}
+
+

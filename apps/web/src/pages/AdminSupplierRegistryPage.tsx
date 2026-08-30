@@ -20,6 +20,9 @@ export function AdminSupplierRegistryPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("PENDING");
 
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     document.title = "Supplier Registry · ProcureAI";
   }, []);
@@ -64,6 +67,14 @@ export function AdminSupplierRegistryPage() {
       return matchesQuery && matchesFilter;
     });
   }, [entries, query, filter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, filter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedEntries = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const pendingCount = entries.filter((entry) => entry.verificationState === "PENDING").length;
   const verifiedCount = entries.filter((entry) => entry.verificationState === "VERIFIED").length;
@@ -150,71 +161,133 @@ export function AdminSupplierRegistryPage() {
         ) : filtered.length === 0 ? (
           <p>No suppliers match the current filters.</p>
         ) : (
-          <div className="gov-table-container">
-            <table className="gov-table">
-              <thead>
-                <tr>
-                  <th scope="col">Supplier</th>
-                  <th scope="col">Sectors</th>
-                  <th scope="col" style={{ width: "120px" }}>
-                    Completion
-                  </th>
-                  <th scope="col" style={{ width: "110px" }}>
-                    Documents
-                  </th>
-                  <th scope="col" style={{ width: "180px" }}>
-                    Status
-                  </th>
-                  <th scope="col" style={{ width: "100px" }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>
-                      <strong>{entry.legalName ?? entry.organizationName}</strong>
-                      {entry.headline !== null && (
-                        <div className="gov-entry-card__meta">{entry.headline}</div>
-                      )}
-                    </td>
-                    <td>
-                      {entry.industries.length === 0 ? (
-                        "—"
-                      ) : (
-                        <ul className="gov-chip-list">
-                          {entry.industries.map((industry) => (
-                            <li key={industry} className="gov-chip">
-                              {industry.replace(/_/g, " ").toLowerCase()}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td>{entry.completionPercentage}%</td>
-                    <td>
-                      {entry.documentCount}
-                      {entry.pendingDocumentCount > 0 && (
-                        <div className="gov-entry-card__meta">
-                          {entry.pendingDocumentCount} to review
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <VerificationBadge state={entry.verificationState} />
-                    </td>
-                    <td>
-                      <Link
-                        className="gov-btn gov-btn--secondary gov-btn--sm"
-                        to={`/admin/suppliers/${entry.id}`}
-                      >
-                        Review
-                      </Link>
-                    </td>
+          <>
+            <div className="gov-table-container">
+              <table className="gov-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Supplier</th>
+                    <th scope="col">Sectors</th>
+                    <th scope="col" style={{ width: "120px" }}>
+                      Completion
+                    </th>
+                    <th scope="col" style={{ width: "110px" }}>
+                      Documents
+                    </th>
+                    <th scope="col" style={{ width: "180px" }}>
+                      Status
+                    </th>
+                    <th scope="col" style={{ width: "100px" }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pagedEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td>
+                        <strong>{entry.legalName ?? entry.organizationName}</strong>
+                        {entry.headline !== null && (
+                          <div className="gov-entry-card__meta">{entry.headline}</div>
+                        )}
+                      </td>
+                      <td>
+                        {entry.industries.length === 0 ? (
+                          "—"
+                        ) : (
+                          <ul className="gov-chip-list">
+                            {entry.industries.map((industry) => (
+                              <li key={industry} className="gov-chip">
+                                {industry.replace(/_/g, " ").toLowerCase()}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td>{entry.completionPercentage}%</td>
+                      <td>
+                        {entry.documentCount}
+                        {entry.pendingDocumentCount > 0 && (
+                          <div className="gov-entry-card__meta">
+                            {entry.pendingDocumentCount} to review
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <VerificationBadge state={entry.verificationState} />
+                      </td>
+                      <td>
+                        <Link
+                          className="gov-btn gov-btn--secondary gov-btn--sm"
+                          to={`/admin/suppliers/${entry.id}`}
+                        >
+                          Review
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="gov-pagination">
+              <div className="gov-pagination__controls">
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--secondary gov-btn--sm"
+                  disabled={currentPage === 1}
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.max(1, prev - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Previous
+                </button>
+
+                <div className="gov-pagination__numbers">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      className={`gov-pagination__number ${currentPage === pageNum ? "gov-pagination__number--active" : ""}`}
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      aria-current={currentPage === pageNum ? "page" : undefined}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="gov-btn gov-btn--secondary gov-btn--sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => {
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+
+              <div className="gov-pagination__options">
+                <label htmlFor="page-size">Rows per page:</label>
+                <select
+                  id="page-size"
+                  className="gov-select gov-select--sm"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+          </>
         )}
       </GovernmentCard>
     </>

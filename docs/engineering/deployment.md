@@ -287,6 +287,25 @@ shared-secret authentication above is not optional.
 
 TLS is enabled automatically for any non-localhost host (`db/pool.ts`).
 
+### Connection poolers (Neon, Supabase)
+
+Neon and Supabase each offer two connection strings: a direct endpoint, and a
+pooled one running PgBouncer in transaction mode (Neon marks it with `-pooler`
+in the hostname). The application is fine on either — it holds no session state
+between statements.
+
+Migrations are the exception. The runner serialises concurrent runs with a
+session-scoped advisory lock, and under transaction pooling the lock and the
+unlock can land on different backends, leaving the lock held and the next run
+blocking on it indefinitely. `migrate.ts` therefore detects a `-pooler` host and
+skips the lock, logging that it did; `schema_migrations`' primary key still
+prevents a migration being applied twice. Set
+`MIGRATE_SKIP_ADVISORY_LOCK=true` to force the same behaviour on another
+provider's pooler.
+
+Use the **direct** connection string when running migrations if you want them
+genuinely serialised across concurrent runners.
+
 ### pgvector is required
 
 `migrations/006_work_package_matching.sql` runs `CREATE EXTENSION IF NOT EXISTS

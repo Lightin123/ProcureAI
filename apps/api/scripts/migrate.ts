@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { loadConfig } from "../src/config/env.js";
 import { closePool, getPool } from "../src/db/pool.js";
 
 /**
@@ -96,7 +97,50 @@ async function run(): Promise<void> {
   );
 }
 
+/**
+ * Whether the connection goes through a transaction-mode connection pooler.
+ *
+ * PgBouncer hands each transaction whichever backend is free, so a
+ * session-scoped advisory lock taken in one statement may be released against a
+ * different backend — leaving the lock held until that connection closes, and
+ * the next run blocking on it forever. Neon's pooled endpoint is the common
+ * case; its direct endpoint has no `-pooler` in the host.
+ *
+ * Detected rather than configured, because the failure it prevents is a silent
+ * hang at start-up, which is the hardest kind to diagnose.
+ */
+function usesTransactionPooler(): boolean {
+  if (process.env.MIGRATE_SKIP_ADVISORY_LOCK === "true") {
+    return true;
+  }
+
+  const url = loadConfig().databaseUrl;
+  if (url === undefined) {
+    return false;
+  }
+
+  try {
+    return new URL(url).hostname.includes("-pooler");
+  } catch {
+    return false;
+  }
+}
+
 async function runExclusively(): Promise<void> {
+  if (usesTransactionPooler()) {
+    // Safe to proceed without it: `schema_migrations` has the filename as its
+    // primary key, so a concurrent run loses the insert and rolls its
+    // transaction back rather than applying anything twice. The lock only makes
+    // that case tidy; it is not what protects the schema.
+    console.log(
+      "Connection uses a transaction pooler; skipping the advisory lock. " +
+        "Use the direct (non-pooled) connection string if migrations must be " +
+        "serialised across concurrent runners.",
+    );
+    await run();
+    return;
+  }
+
   const lockHolder = await getPool().connect();
 
   try {

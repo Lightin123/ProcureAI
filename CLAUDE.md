@@ -279,7 +279,11 @@ See [docs/engineering/security.md](docs/engineering/security.md) and
 - Workflow transitions beyond `WORK_PACKAGES_CONFIRMED`
 - Background job infrastructure (analysis is synchronous — see D30)
 - Administrator user-management UI or password reset (U30)
-- Docker, CI/CD, or deployment configuration
+- Docker or CI/CD pipelines. Deployment configuration now exists for
+  Netlify (`apps/web`) and Render (`apps/api`, `apps/ai-service`) — see
+  [docs/engineering/deployment.md](docs/engineering/deployment.md). Keep it
+  in sync when changing environment variables, build output layout, or the
+  storage driver.
 
 ## Development Workflow
 

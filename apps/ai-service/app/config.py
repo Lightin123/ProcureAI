@@ -50,7 +50,23 @@ class Settings(BaseSettings):
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
     embedding_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS
 
+    # Where fastembed caches the downloaded ONNX model. Left unset it uses the
+    # library default inside the container, which on a platform with an
+    # ephemeral filesystem means re-downloading ~90 MB on every deploy. Point it
+    # at a mounted disk to keep the model across restarts.
+    embedding_cache_dir: str | None = None
+
     request_timeout_seconds: float = 55.0
+
+    # The service has no user identity of its own: its only caller is the
+    # Express backend, which holds this shared secret. Unset is permitted in
+    # development (and logged); production refuses to start without it.
+    ai_service_token: str | None = None
+    environment: Literal["development", "production"] = "development"
+
+    # Loopback by default, so a development machine never exposes the service on
+    # its network. A deployment sets HOST=0.0.0.0 and takes PORT from the
+    # platform; authentication, not the bind address, is what protects it there.
     host: str = "127.0.0.1"
     port: int = 8000
 

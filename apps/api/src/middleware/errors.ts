@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
+import { loadConfig } from "../config/env.js";
+
 export class ApiError extends Error {
   readonly statusCode: number;
   readonly code: string;
@@ -37,7 +39,16 @@ export function errorHandler(
   }
 
   console.error("Unhandled error:", error);
-  const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+
+  // An unhandled error is by definition one nobody wrote a message for, so its
+  // text is whatever the failing library produced — a driver error naming a
+  // column, a constraint or a host. That is useful in development and is
+  // information disclosure in production, where the caller gets the code only.
+  const message =
+    loadConfig().isProduction || !(error instanceof Error)
+      ? "An unexpected error occurred."
+      : error.message;
+
   response.status(500).json({
     error: { code: "INTERNAL_ERROR", message },
   });

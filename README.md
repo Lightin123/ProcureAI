@@ -413,6 +413,22 @@ Two development scripts, neither part of the application:
 
 ---
 
+## Deploying
+
+The platform deploys to Netlify (`apps/web`), two Render services (`apps/api`
+and `apps/ai-service`) and a hosted PostgreSQL with pgvector. The browser
+reaches the API through a Netlify `/api/*` proxy rewrite, which keeps everything
+same-origin so the `SameSite=Strict` session cookie and the absence of CORS are
+preserved exactly as they are in development.
+
+Build settings live in [netlify.toml](netlify.toml); every Render setting,
+environment variable, the migration procedure and the persistent-storage
+requirement are documented in
+[docs/engineering/deployment.md](docs/engineering/deployment.md). Demo seeding
+is manual and never runs as part of a deployment.
+
+---
+
 ## Milestone 4 Integration (After Merge)
 
 Milestone 4 (work packages) is being built on a separate branch against the

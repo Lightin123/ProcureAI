@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { loadConfig } from "../config/env.js";
 import { ApiError } from "../middleware/errors.js";
+import { internalHeaders } from "./internalAuth.js";
 
 const requirementKindSchema = z.enum(["REQUIREMENT", "CONSTRAINT"]);
 const requirementCategorySchema = z.enum([
@@ -99,7 +100,7 @@ export async function checkAiService(): Promise<{ provider: string; model: strin
   const config = loadConfig();
   try {
     const response = await fetch(`${config.aiServiceUrl}/health`, {
-      headers: { Accept: "application/json" },
+      headers: internalHeaders(),
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) return null;
@@ -119,7 +120,7 @@ export async function requestRequirementAnalysis(
   try {
     response = await fetch(`${config.aiServiceUrl}/internal/v1/requirement-analysis`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: internalHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         project_title: input.projectTitle,
         problem_description: input.problemDescription,
@@ -168,7 +169,7 @@ export async function requestWorkPackageDecomposition(
   try {
     response = await fetch(`${config.aiServiceUrl}/internal/v1/work-package-decomposition`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: internalHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         project_title: input.projectTitle,
         problem_description: input.problemDescription,
@@ -254,7 +255,7 @@ export async function requestCapabilityInsights(
   try {
     response = await fetch(`${config.aiServiceUrl}/internal/v1/vendor-capability-insights`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: internalHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         organization_name: input.organizationName,
         capability_document: input.capabilityDocument,
@@ -365,7 +366,7 @@ export async function requestResponseInsights(
   try {
     response = await fetch(`${config.aiServiceUrl}/internal/v1/response-evaluation-insights`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: internalHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         package_number: input.packageNumber,
         package_title: input.packageTitle,

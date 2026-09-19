@@ -1,0 +1,28 @@
+# Netlify builds only apps/web. The API and the AI service are deployed
+# separately; see docs/engineering/deployment.md.
+#
+# The /api/* proxy rule is NOT declared here: netlify.toml cannot interpolate an
+# environment variable into a redirect target, and hardcoding one deployment's
+# backend URL into the repository is exactly what we want to avoid. The build
+# generates dist/_redirects instead, from API_PROXY_TARGET — which must be set
+# in the Netlify site's environment variables, or the build fails with a message
+# saying so. See apps/web/scripts/writeRedirects.mjs.
+
+[build]
+  base = "apps/web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The portal is never framed, never sniffed, and never leaks a full URL to a
+# third party. No CSP is set here: it belongs with the application, not with the
+# host, and an untested one would break the portal rather than protect it.
+[[headers]]
+  for = "/*"
+
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

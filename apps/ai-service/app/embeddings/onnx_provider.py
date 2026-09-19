@@ -57,7 +57,7 @@ class LocalOnnxEmbeddingProvider:
 
     name = "local-onnx"
 
-    def __init__(self, model_name: str, dimensions: int) -> None:
+    def __init__(self, model_name: str, dimensions: int, cache_dir: str | None = None) -> None:
         try:
             from fastembed import TextEmbedding
         except ImportError as error:  # pragma: no cover - dependency is declared
@@ -67,7 +67,15 @@ class LocalOnnxEmbeddingProvider:
             ) from error
 
         try:
-            self._model = TextEmbedding(model_name=model_name)
+            # cache_dir is where the ~90 MB model is downloaded to and read back
+            # from. Left unset, fastembed chooses a temporary location, which on
+            # a host with an ephemeral filesystem means downloading it again on
+            # every restart.
+            self._model = (
+                TextEmbedding(model_name=model_name, cache_dir=cache_dir)
+                if cache_dir
+                else TextEmbedding(model_name=model_name)
+            )
         except Exception as error:  # noqa: BLE001 — surfaced as one failure mode
             raise EmbeddingError(
                 f"The embedding model {model_name} could not be loaded ({error}). "

@@ -14,6 +14,7 @@
 import { z } from "zod";
 
 import { loadConfig } from "../config/env.js";
+import { internalHeaders } from "./internalAuth.js";
 
 const embeddingResponseSchema = z.object({
   embeddings: z.array(z.array(z.number())),
@@ -72,7 +73,7 @@ export async function requestEmbeddings(
     try {
       response = await fetch(`${config.aiServiceUrl}/internal/v1/embeddings`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: internalHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ texts: batch }),
         signal: AbortSignal.timeout(config.aiServiceTimeoutMs),
       });
@@ -144,7 +145,7 @@ export async function currentEmbeddingModel(): Promise<string | undefined> {
   const config = loadConfig();
   try {
     const response = await fetch(`${config.aiServiceUrl}/health`, {
-      headers: { Accept: "application/json" },
+      headers: internalHeaders(),
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) return undefined;

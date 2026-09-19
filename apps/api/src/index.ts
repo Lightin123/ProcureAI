@@ -1,7 +1,7 @@
 import cookieParser from "cookie-parser";
 import express from "express";
 
-import { loadConfig } from "./config/env.js";
+import { assertProductionConfig, loadConfig } from "./config/env.js";
 import { requireAuth, requireSameOrigin } from "./middleware/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/errors.js";
 import { authRouter } from "./routes/auth.js";
@@ -22,11 +22,18 @@ import {
 } from "./routes/workPackages.js";
 
 const config = loadConfig();
+
+// Fails the deploy rather than one request at a time when a production
+// environment is missing something that would lose data or open a boundary.
+assertProductionConfig(config);
+
 const app = express();
 
 // request.ip reflects the proxy's client address rather than the proxy itself,
-// which the login rate limiter keys on.
-app.set("trust proxy", "loopback");
+// which the login and registration rate limiters key on. The number of proxies
+// to trust is configuration: "loopback" locally, and the real hop count when
+// the process runs behind a platform router (see TRUST_PROXY).
+app.set("trust proxy", config.trustProxy);
 
 // Compliance documents arrive base64-encoded in the JSON body (D59), so this
 // one path gets a larger ceiling. Mounted before the global parser, which

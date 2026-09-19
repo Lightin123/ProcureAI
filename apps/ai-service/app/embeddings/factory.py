@@ -47,7 +47,9 @@ def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
 
     try:
         provider = LocalOnnxEmbeddingProvider(
-            settings.embedding_model, settings.embedding_dimensions
+            settings.embedding_model,
+            settings.embedding_dimensions,
+            settings.embedding_cache_dir,
         )
     except EmbeddingError as error:
         logger.warning(
